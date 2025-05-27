@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Agency Management{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
+    <p class="text-gray-600">Overview of {{ company.name }}'s performance</p>
+</div>
+
+<!-- Key Metrics -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center">
+            <div class="flex-1">
+                <p class="text-sm font-medium text-gray-600">Current Month Revenue</p>
+                <p class="text-2xl font-bold text-green-600">${{ current_revenue|floatformat:0 }}</p>
+            </div>
+            <div class="ml-4">
+                <i class="fas fa-dollar-sign text-green-500 text-2xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center">
+            <div class="flex-1">
+                <p class="text-sm font-medium text-gray-600">Active Clients</p>
+                <p class="text-2xl font-bold text-blue-600">{{ total_clients }}</p>
+            </div>
+            <div class="ml-4">
+                <i class="fas fa-users text-blue-500 text-2xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center">
+            <div class="flex-1">
+                <p class="text-sm font-medium text-gray-600">Total Projects</p>
+                <p class="text-2xl font-bold text-purple-600">{{ total_projects }}</p>
+            </div>
+            <div class="ml-4">
+                <i class="fas fa-project-diagram text-purple-500 text-2xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center">
+            <div class="flex-1">
+                <p class="text-sm font-medium text-gray-600">Team Members</p>
+                <p class="text-2xl font-bold text-orange-600">{{ total_team_members }}</p>
+            </div>
+            <div class="ml-4">
+                <i class="fas fa-user-friends text-orange-500 text-2xl"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Revenue Chart -->
+<div class="bg-white rounded-lg shadow mb-8">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <div class="flex justify-between items-center">
+            <h2 class="text-xl font-semibold text-gray-900">Monthly Revenue</h2>
+            <div class="flex space-x-4">
+                <select id="yearSelect" class="border border-gray-300 rounded-md px-3 py-2">
+                    <option value="2024">2024</option>
+                    <option value="2025" selected>2025</option>
+                    <option value="2026">2026</option>
+                </select>
+                <button id="refreshChart" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                    <i class="fas fa-refresh mr-2"></i>Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="p-6">
+        <div class="relative h-96">
+            <canvas id="revenueChart"></canvas>
+        </div>
+        <div class="mt-4 flex justify-center space-x-6 text-sm">
+            <div class="flex items-center">
+                <div class="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                <span>Booked Revenue</span>
+            </div>
+            <div class="flex items-center">
+                <div class="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                <span>Forecasted Revenue</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+        <div class="space-y-3">
+            <a href="/admin/agency/client/add/" class="block w-full bg-blue-500 text-white text-center py-2 px-4 rounded-md hover:bg-blue-600">
+                <i class="fas fa-plus mr-2"></i>Add Client
+            </a>
+            <a href="/admin/agency/project/add/" class="block w-full bg-green-500 text-white text-center py-2 px-4 rounded-md hover:bg-green-600">
+                <i class="fas fa-plus mr-2"></i>Add Project
+            </a>
+            <a href="/admin/agency/userprofile/add/" class="block w-full bg-purple-500 text-white text-center py-2 px-4 rounded-md hover:bg-purple-600">
+                <i class="fas fa-plus mr-2"></i>Add Team Member
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+        <div class="text-gray-600">
+            <p class="mb-2">No recent activity</p>
+            <p class="text-sm">Start by adding some data through the admin panel.</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Next Steps</h3>
+        <div class="text-sm text-gray-600 space-y-2">
+            <p>1. Add your clients in the admin</p>
+            <p>2. Create projects for each client</p>
+            <p>3. Add team member profiles</p>
+            <p>4. Start tracking monthly revenue</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let revenueChart;
+    
+    // Initialize revenue chart
+    function initializeRevenueChart() {
+        const ctx = document.getElementById('revenueChart').getContext('2d');
+        
+        revenueChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Booked Revenue',
+                    data: [],
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'Forecasted Revenue',
+                    data: [],
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + formatCurrency(context.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Month'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Revenue ($)'
+                        },
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return formatCurrency(value);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Load revenue chart data
+    function loadRevenueData() {
+        const year = document.getElementById('yearSelect').value;
+        
+        fetch(`{% url 'agency:revenue_chart_data' %}?year=${year}`)
+            .then(response => response.json())
+            .then(data => {
+                revenueChart.data.labels = data.months;
+                revenueChart.data.datasets[0].data = data.booked;
+                revenueChart.data.datasets[1].data = data.forecast;
+                revenueChart.update();
+            })
+            .catch(error => {
+                console.error('Error loading revenue data:', error);
+            });
+    }
+    
+    // Event listeners
+    document.getElementById('yearSelect').addEventListener('change', loadRevenueData);
+    document.getElementById('refreshChart').addEventListener('click', loadRevenueData);
+    
+    // Initialize
+    initializeRevenueChart();
+    loadRevenueData();
+});
+</script>
+{% endblock %}
