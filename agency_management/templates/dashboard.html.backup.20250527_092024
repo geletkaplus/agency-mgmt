@@ -90,11 +90,11 @@
                     </div>
                 </div>
 
-                <!-- Operating Costs (Monthly) -->
+                <!-- Monthly Costs -->
                 <div class="bg-white rounded-lg shadow p-6">
                     <div class="flex items-center">
                         <div class="flex-1">
-                            <p class="text-sm font-medium text-gray-600">Operating Costs (Monthly)</p>
+                            <p class="text-sm font-medium text-gray-600">Monthly Costs</p>
                             <p class="text-2xl font-bold text-red-600">
                                 <script>document.write(formatCurrency({{ current_month_costs|default:0 }}));</script>
                             </p>
@@ -185,11 +185,11 @@
                 </div>
             </div>
 
-            <!-- Revenue & Expenses Chart -->
+            <!-- Revenue Chart -->
             <div class="bg-white rounded-lg shadow mb-8">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <div class="flex justify-between items-center">
-                        <h2 class="text-xl font-semibold text-gray-900">Revenue & Operating Expenses</h2>
+                        <h2 class="text-xl font-semibold text-gray-900">Monthly Revenue</h2>
                         <div class="flex space-x-4">
                             <select id="yearSelect" class="border border-gray-300 rounded-md px-3 py-2">
                                 <option value="2024">2024</option>
@@ -217,10 +217,6 @@
                         <div class="flex items-center">
                             <div class="w-4 h-4 bg-blue-500 rounded mr-2"></div>
                             <span>Forecasted Revenue</span>
-                        </div>
-                        <div class="flex items-center">
-                            <div class="w-4 h-4 bg-red-500 rounded mr-2"></div>
-                            <span>Operating Expenses</span>
                         </div>
                     </div>
                     <!-- Debug Info -->
@@ -311,14 +307,6 @@
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         fill: true,
                         tension: 0.4
-                    }, {
-                        label: 'Operating Expenses',
-                        data: [],
-                        borderColor: 'rgb(239, 68, 68)',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        fill: true,
-                        tension: 0.4,
-                        borderDash: [5, 5]
                     }]
                 },
                 options: {
@@ -377,14 +365,12 @@
                     revenueChart.data.labels = data.months;
                     revenueChart.data.datasets[0].data = data.booked;
                     revenueChart.data.datasets[1].data = data.forecast;
-                    revenueChart.data.datasets[2].data = data.expenses || new Array(12).fill(0);
                     revenueChart.update();
                     
                     // Show some debug info
                     const totalBooked = data.booked.reduce((a, b) => a + b, 0);
                     const totalForecast = data.forecast.reduce((a, b) => a + b, 0);
-                    const totalExpenses = (data.expenses || []).reduce((a, b) => a + b, 0);
-                    console.log(`Total Booked: $${totalBooked}, Total Forecast: $${totalForecast}, Total Expenses: $${totalExpenses}`);
+                    console.log(`Total Booked: $${totalBooked}, Total Forecast: $${totalForecast}`);
                 })
                 .catch(error => {
                     console.error('Error loading revenue data:', error);
@@ -393,7 +379,6 @@
                     revenueChart.data.labels = months;
                     revenueChart.data.datasets[0].data = [10000, 12000, 15000, 18000, 16000, 20000, 22000, 19000, 21000, 23000, 25000, 27000];
                     revenueChart.data.datasets[1].data = [5000, 8000, 12000, 15000, 18000, 16000, 19000, 21000, 24000, 26000, 28000, 30000];
-                    revenueChart.data.datasets[2].data = [8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000];
                     revenueChart.update();
                 });
         }
@@ -412,10 +397,8 @@
                         <div><strong>Data Source:</strong> ${lastChartData.debug?.data_source || 'Unknown'}</div>
                         <div><strong>Total Booked:</strong> $${lastChartData.debug?.total_booked || 0}</div>
                         <div><strong>Total Forecast:</strong> $${lastChartData.debug?.total_forecast || 0}</div>
-                        <div><strong>Total Expenses:</strong> $${lastChartData.debug?.total_expenses || 0}</div>
                         <div><strong>Booked Data:</strong> [${lastChartData.booked?.join(', ') || 'No data'}]</div>
                         <div><strong>Forecast Data:</strong> [${lastChartData.forecast?.join(', ') || 'No data'}]</div>
-                        <div><strong>Expenses Data:</strong> [${lastChartData.expenses?.join(', ') || 'No data'}]</div>
                         ${lastChartData.error ? `<div><strong>Error:</strong> ${lastChartData.error}</div>` : ''}
                     `;
                 } else {
