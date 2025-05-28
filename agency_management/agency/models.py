@@ -46,6 +46,8 @@ class UserProfile(models.Model):
     end_date = models.DateField(null=True, blank=True)
     weekly_capacity_hours = models.DecimalField(max_digits=4, decimal_places=1, default=40)
     utilization_target = models.DecimalField(max_digits=4, decimal_places=1, default=80)
+    is_project_manager = models.BooleanField(default=False, help_text="Can manage projects and see PM dashboard")
+    
     
     def __str__(self):
         return f"{self.user.get_full_name()} ({self.role})"

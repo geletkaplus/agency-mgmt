@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Dashboard - {{ user.get_full_name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-6">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">My Dashboard</h1>
+                        <p class="text-gray-600">{{ user.get_full_name }} - {{ user_profile.get_role_display }}</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        {% if request.session.viewing_as_user %}
+                        <a href="{% url 'agency:switch_back' %}" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600">
+                            <i class="fas fa-arrow-left mr-2"></i>Back to Admin View
+                        </a>
+                        {% endif %}
+                        {% if user_profile.is_project_manager %}
+                        <a href="{% url 'agency:pm_dashboard' %}" class="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600">
+                            <i class="fas fa-briefcase mr-2"></i>PM Dashboard
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            
+            <!-- Current Month Overview -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-600">Hours This Month</p>
+                            <p class="text-2xl font-bold text-blue-600">{{ total_hours_this_month|floatformat:0 }}</p>
+                            <p class="text-sm text-gray-500">of {{ monthly_capacity|floatformat:0 }} capacity</p>
+                        </div>
+                        <div class="ml-4">
+                            <i class="fas fa-clock text-blue-500 text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-600">Utilization Rate</p>
+                            <p class="text-2xl font-bold {% if utilization_rate > 100 %}text-red-600{% elif utilization_rate > 80 %}text-green-600{% elif utilization_rate > 50 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                {{ utilization_rate|floatformat:0 }}%
+                            </p>
+                            <p class="text-sm text-gray-500">Target: {{ user_profile.utilization_target }}%</p>
+                        </div>
+                        <div class="ml-4">
+                            <i class="fas fa-chart-pie {% if utilization_rate > 100 %}text-red-500{% elif utilization_rate > 80 %}text-green-500{% elif utilization_rate > 50 %}text-yellow-500{% else %}text-red-500{% endif %} text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-600">Active Projects</p>
+                            <p class="text-2xl font-bold text-purple-600">{{ allocated_projects.count }}</p>
+                        </div>
+                        <div class="ml-4">
+                            <i class="fas fa-project-diagram text-purple-500 text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-600">Hourly Rate</p>
+                            <p class="text-2xl font-bold text-green-600">${{ user_profile.hourly_rate|floatformat:0 }}</p>
+                            <p class="text-sm text-gray-500">per hour</p>
+                        </div>
+                        <div class="ml-4">
+                            <i class="fas fa-dollar-sign text-green-500 text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Allocations -->
+            <div class="bg-white rounded-lg shadow mb-8">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-xl font-semibold text-gray-900">Current Month Allocations ({{ current_month }}/{{ current_year }})</h2>
+                </div>
+                <div class="p-6">
+                    {% if project_allocations %}
+                    <div class="space-y-4">
+                        {% for allocation in project_allocations %}
+                        <div class="border rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="font-semibold text-gray-900">{{ allocation.project.name }}</h3>
+                                    <p class="text-sm text-gray-600">{{ allocation.client.name }}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-2xl font-bold text-blue-600">{{ allocation.hours|floatformat:0 }} hrs</p>
+                                    <p class="text-sm text-gray-500">${{ allocation.value|floatformat:0 }} value</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-gray-500 text-center py-8">No allocations for this month</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Utilization History -->
+            <div class="bg-white rounded-lg shadow mb-8">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-xl font-semibold text-gray-900">Utilization History</h2>
+                </div>
+                <div class="p-6">
+                    <div class="relative h-64">
+                        <canvas id="utilizationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upcoming Allocations -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-xl font-semibold text-gray-900">Upcoming Allocations</h2>
+                </div>
+                <div class="p-6">
+                    {% if upcoming_allocations %}
+                    <div class="space-y-3">
+                        {% for allocation in upcoming_allocations %}
+                        <div class="flex items-center justify-between py-2 border-b last:border-b-0">
+                            <div>
+                                <p class="font-medium text-gray-900">{{ allocation.project.name }}</p>
+                                <p class="text-sm text-gray-600">{{ allocation.month }}/{{ allocation.year }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-semibold">{{ allocation.allocated_hours|floatformat:0 }} hrs</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-gray-500 text-center py-4">No upcoming allocations</p>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    // Utilization Chart
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('utilizationChart').getContext('2d');
+        const historicalData = {{ historical_data|safe }};
+        
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: historicalData.map(d => `${d.month}/${d.year}`),
+                datasets: [{
+                    label: 'Hours Allocated',
+                    data: historicalData.map(d => d.hours),
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    yAxisID: 'y-hours'
+                }, {
+                    label: 'Utilization %',
+                    data: historicalData.map(d => d.utilization),
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    yAxisID: 'y-utilization'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    'y-hours': {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Hours'
+                        }
+                    },
+                    'y-utilization': {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Utilization %'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+    });
+    </script>
+</body>
+</html>
