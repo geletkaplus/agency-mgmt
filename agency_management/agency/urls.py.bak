@@ -5,18 +5,7 @@ from . import views
 app_name = 'agency'
 
 urlpatterns = [
-    # Dashboard routing
-    path('', views.dashboard_router, name='dashboard_router'),
-    path('dashboard/', views.dashboard, name='dashboard'),
-    path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
-    path('pm-dashboard/', views.pm_dashboard, name='pm_dashboard'),
-    path('employee-dashboard/', views.employee_dashboard, name='employee_dashboard'),
-    
-    # User switching
-    path('switch-user/', views.switch_user_view, name='switch_user'),
-    path('switch-back/', views.switch_back_to_admin, name='switch_back'),
-    
-    # Existing URLs
+    path('', views.dashboard, name='dashboard'),
     path('capacity/', views.capacity_dashboard, name='capacity_dashboard'),
     path('clients/', views.clients_list, name='clients_list'),
     path('clients/<uuid:client_id>/', views.client_detail, name='client_detail'),

@@ -34,6 +34,16 @@
                         <h1 class="text-3xl font-bold text-gray-900">Agency Management</h1>
                         {% if company %}
                             <span class="ml-4 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">{{ company.name }}</span>
+                        {% if user.is_superuser %}
+                        <div class="ml-4">
+                            <select id="userSwitcher" class="border border-gray-300 rounded-md px-3 py-2 text-sm" onchange="switchUser(this.value)">
+                                <option value="">View as User...</option>
+                                {% for profile in all_profiles %}
+                                <option value="{{ profile.user.id }}">{{ profile.user.get_full_name }} ({{ profile.get_role_display }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
                         {% endif %}
                     </div>
                     <div class="flex space-x-4">
@@ -440,6 +450,13 @@
         initializeRevenueChart();
         loadRevenueData();
     });
+    </script>
+    <script>
+    function switchUser(userId) {
+        if (userId) {
+            window.location.href = "/agency/switch-user/?user_id=" + userId;
+        }
+    }
     </script>
 </body>
 </html>
