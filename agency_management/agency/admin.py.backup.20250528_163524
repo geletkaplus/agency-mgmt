@@ -8,7 +8,6 @@ from django.urls import path
 from django.shortcuts import redirect
 from django.contrib import messages
 from django.http import JsonResponse
-import datetime
 from decimal import Decimal
 import json
 import calendar
@@ -102,7 +101,9 @@ class ProjectAdmin(admin.ModelAdmin):
     search_fields = ['name', 'client__name']
     date_hierarchy = 'start_date'
     autocomplete_fields = ['client', 'project_manager']
-    filter_horizontal = ['team_members']  # Better UI for M2M field
+    
+    # Use both inlines
+    inlines = [ProjectTeamInline, ProjectAllocationInline]
     
     fieldsets = (
         ('Project Information', {
@@ -110,14 +111,13 @@ class ProjectAdmin(admin.ModelAdmin):
         }),
         ('Timeline', {
             'fields': ('start_date', 'end_date'),
-            'description': 'Save the project after setting dates to see the allocation grid.'
+            'description': 'Change dates and save to update the allocation grid below.'
         }),
         ('Financials', {
             'fields': ('total_revenue', 'total_hours'),
         }),
-        ('Team', {
-            'fields': ('project_manager', 'team_members'),
-            'description': 'Select team members here, then use the allocation grid below to assign hours.'
+        ('Management', {
+            'fields': ('project_manager',),
         })
     )
     
@@ -164,123 +164,85 @@ class ProjectAdmin(admin.ModelAdmin):
         return mark_safe('<span style="color:#999;">No hours</span>')
     allocation_status.short_description = "Allocated"
     
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        obj = self.get_object(request, object_id)
+        
+        if obj:
+            # Always prepare allocation data if dates are set
+            if obj.start_date and obj.end_date:
+                from datetime import date
+                from dateutil.relativedelta import relativedelta
+                
+                project_months = []
+                current = obj.start_date.replace(day=1)
+                end = obj.end_date.replace(day=1)
+                
+                while current <= end:
+                    project_months.append({
+                        'year': current.year,
+                        'month': current.month,
+                        'month_name': calendar.month_abbr[current.month],
+                        'date': current
+                    })
+                    current += relativedelta(months=1)
+                
+                # Get team members - either assigned or all from company
+                if hasattr(obj, 'team_members'):
+                    team_members = obj.team_members.all()
+                    if not team_members.exists():
+                        # Show all company members if none assigned
+                        team_members = UserProfile.objects.filter(
+                            company=obj.company,
+                            status__in=['full_time', 'part_time', 'contractor']
+                        )
+                else:
+                    team_members = UserProfile.objects.filter(
+                        company=obj.company,
+                        status__in=['full_time', 'part_time', 'contractor']
+                    )
+                
+                team_members = team_members.select_related('user').order_by('user__last_name')
+                
+                # Get existing allocations
+                allocations = ProjectAllocation.objects.filter(project=obj)
+                allocation_dict = {}
+                for alloc in allocations:
+                    key = f"{alloc.user_profile_id}_{alloc.year}_{alloc.month}"
+                    allocation_dict[key] = {
+                        'hours': float(alloc.allocated_hours),
+                        'id': alloc.id
+                    }
+                
+                extra_context.update({
+                    'project': obj,
+                    'project_months': project_months,
+                    'team_members': team_members,
+                    'existing_allocations': json.dumps(allocation_dict),
+                    'show_allocation_grid': True
+                })
+            else:
+                extra_context['show_allocation_grid'] = False
+                messages.info(request, "Set project start and end dates to see the hour allocation grid.")
+        
+        return super().change_view(request, object_id, form_url, extra_context=extra_context)
+    
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if change and ('start_date' in form.changed_data or 'end_date' in form.changed_data):
+            messages.warning(request, 
+                "Project dates have changed! The allocation grid has been updated. "
+                "Please review and adjust team allocations as needed."
+            )
+    
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
             path('<path:object_id>/save-allocations/', 
                  self.admin_site.admin_view(self.save_allocations_view), 
                  name='agency_project_save_allocations'),
-            path('<path:object_id>/get-allocation-data/',
-                 self.admin_site.admin_view(self.get_allocation_data_view),
-                 name='agency_project_get_allocation_data'),
-            path('<path:object_id>/available-members/',
-                 self.admin_site.admin_view(self.get_available_members_view),
-                 name='agency_project_available_members'),
-            path('<path:object_id>/add-member/',
-                 self.admin_site.admin_view(self.add_member_view),
-                 name='agency_project_add_member'),
-            path('<path:object_id>/remove-member/',
-                 self.admin_site.admin_view(self.remove_member_view),
-                 name='agency_project_remove_member'),
         ]
         return custom_urls + urls
-    
-    def get_allocation_data_view(self, request, object_id):
-        """Get team members and existing allocations"""
-        try:
-            project = self.get_object(request, object_id)
-            
-            # Get team members
-            team_members = []
-            if hasattr(project, 'team_members'):
-                for member in project.team_members.all():
-                    team_members.append({
-                        'id': str(member.id),
-                        'name': member.user.get_full_name() or member.user.username,
-                        'role': member.get_role_display(),
-                        'hourly_rate': float(member.hourly_rate),
-                        'initials': ''.join([n[0].upper() for n in (member.user.get_full_name() or member.user.username).split()[:2]])
-                    })
-            
-            # Get existing allocations
-            allocations = {}
-            for alloc in ProjectAllocation.objects.filter(project=project):
-                # For now, store monthly allocations (we'll distribute to weeks in JS)
-                # You could enhance this to store actual weekly data
-                key = f"{alloc.user_profile_id}_{alloc.year}_{alloc.month}_1"
-                allocations[key] = float(alloc.allocated_hours)
-            
-            return JsonResponse({
-                'team_members': team_members,
-                'allocations': allocations
-            })
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
-    
-    def get_available_members_view(self, request, object_id):
-        """Get available team members not yet on the project"""
-        try:
-            project = self.get_object(request, object_id)
-            
-            # Get all company members not on the project
-            members = UserProfile.objects.filter(
-                company=project.company,
-                status__in=['full_time', 'part_time', 'contractor']
-            ).exclude(
-                id__in=project.team_members.values_list('id', flat=True)
-            ).select_related('user')
-            
-            member_list = []
-            for member in members:
-                member_list.append({
-                    'id': str(member.id),
-                    'name': member.user.get_full_name() or member.user.username,
-                    'role': member.get_role_display()
-                })
-            
-            return JsonResponse({'members': member_list})
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
-    
-    def add_member_view(self, request, object_id):
-        """Add a team member to the project"""
-        if request.method == 'POST':
-            try:
-                project = self.get_object(request, object_id)
-                data = json.loads(request.body)
-                member_id = data.get('member_id')
-                
-                member = UserProfile.objects.get(id=member_id, company=project.company)
-                project.team_members.add(member)
-                
-                return JsonResponse({'success': True})
-            except Exception as e:
-                return JsonResponse({'error': str(e)}, status=400)
-        
-        return JsonResponse({'error': 'Invalid request'}, status=400)
-    
-    def remove_member_view(self, request, object_id):
-        """Remove a team member from the project"""
-        if request.method == 'POST':
-            try:
-                project = self.get_object(request, object_id)
-                data = json.loads(request.body)
-                member_id = data.get('member_id')
-                
-                member = UserProfile.objects.get(id=member_id)
-                project.team_members.remove(member)
-                
-                # Also remove their allocations
-                ProjectAllocation.objects.filter(
-                    project=project,
-                    user_profile=member
-                ).delete()
-                
-                return JsonResponse({'success': True})
-            except Exception as e:
-                return JsonResponse({'error': str(e)}, status=400)
-        
-        return JsonResponse({'error': 'Invalid request'}, status=400)
     
     def save_allocations_view(self, request, object_id):
         """Handle allocation saves via AJAX"""
@@ -290,39 +252,45 @@ class ProjectAdmin(admin.ModelAdmin):
                 data = json.loads(request.body)
                 allocations = data.get('allocations', [])
                 
-                # Clear existing allocations for this project
-                ProjectAllocation.objects.filter(project=project).delete()
-                
-                # Group allocations by member/month and sum the hours
-                monthly_totals = {}
-                for alloc in allocations:
-                    key = (alloc['member_id'], alloc['year'], alloc['month'])
-                    if key not in monthly_totals:
-                        monthly_totals[key] = 0
-                    monthly_totals[key] += float(alloc['hours'])
-                
-                # Create allocations
-                for (member_id, year, month), hours in monthly_totals.items():
+                # Update allocations
+                for alloc_data in allocations:
+                    user_profile_id = alloc_data['user_profile']
+                    year = int(alloc_data['year'])
+                    month = int(alloc_data['month'])
+                    hours = Decimal(str(alloc_data['hours']))
+                    
                     if hours > 0:
-                        member = UserProfile.objects.get(id=member_id)
-                        ProjectAllocation.objects.create(
+                        user_profile = UserProfile.objects.get(id=user_profile_id)
+                        ProjectAllocation.objects.update_or_create(
                             project=project,
-                            user_profile=member,
+                            user_profile=user_profile,
                             year=year,
                             month=month,
-                            allocated_hours=hours,
-                            hourly_rate=member.hourly_rate
+                            defaults={
+                                'allocated_hours': hours,
+                                'hourly_rate': user_profile.hourly_rate
+                            }
                         )
+                    else:
+                        # Delete allocation if hours is 0
+                        ProjectAllocation.objects.filter(
+                            project=project,
+                            user_profile_id=user_profile_id,
+                            year=year,
+                            month=month
+                        ).delete()
                 
                 return JsonResponse({'status': 'success'})
             except Exception as e:
                 return JsonResponse({'status': 'error', 'message': str(e)})
         
         return JsonResponse({'status': 'error', 'message': 'Invalid request'})
+
+
+# Simple ProjectAllocation Admin
 @admin.register(ProjectAllocation)
 class ProjectAllocationAdmin(admin.ModelAdmin):
     list_display = ['project', 'user_profile', 'month_year', 'allocated_hours']
-    ordering = ['-year', '-month', 'project__name']
     list_filter = ['year', 'month', 'project__company']
     search_fields = ['project__name', 'user_profile__user__first_name']
     

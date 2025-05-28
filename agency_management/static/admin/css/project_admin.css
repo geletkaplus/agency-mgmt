@@ -1,16 +1,263 @@
-/* Better styling for team assignment inline */
-.inline-group .tabular tr.has_original td {
-    padding-top: 8px !important;
+/* Project Admin Styles */
+.allocation-grid-container {
+    margin-top: 20px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 20px;
 }
 
-.inline-group h2 {
-    background: #495057 !important;
-    color: white !important;
+.allocation-header {
+    background: #495057;
+    color: white;
+    padding: 15px;
+    border-radius: 4px 4px 0 0;
+    margin: -20px -20px 20px -20px;
 }
 
-/* Highlight date change warning */
-.messagelist .warning {
-    background: #fff3cd !important;
-    border: 1px solid #ffeeba !important;
-    color: #856404 !important;
+.allocation-header h3 {
+    margin: 0;
+    font-size: 1.2em;
+    font-weight: normal;
+}
+
+.allocation-summary {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+.allocation-summary-item {
+    text-align: center;
+}
+
+.allocation-summary-item .value {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #495057;
+}
+
+.allocation-summary-item .label {
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.allocation-table {
+    width: 100%;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.allocation-table th {
+    background: #f8f9fa;
+    font-weight: normal;
+    font-size: 0.9em;
+    padding: 10px;
+    border-bottom: 2px solid #dee2e6;
+    white-space: nowrap;
+}
+
+.allocation-table th.month-header {
+    background: #e9ecef;
+    font-weight: bold;
+    text-align: center;
+    border-right: 2px solid #dee2e6;
+}
+
+.allocation-table th.week-header {
+    text-align: center;
+    font-size: 0.8em;
+    color: #6c757d;
+}
+
+.allocation-table td {
+    padding: 8px;
+    border-bottom: 1px solid #dee2e6;
+    border-right: 1px solid #e9ecef;
+}
+
+.allocation-table td.month-separator {
+    border-right: 2px solid #dee2e6;
+}
+
+.allocation-table td.team-member-cell {
+    background: #f8f9fa;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    min-width: 200px;
+}
+
+.allocation-table .member-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.allocation-table .member-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #6c757d;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9em;
+    font-weight: bold;
+}
+
+.allocation-table .member-details {
+    flex: 1;
+}
+
+.allocation-table .member-name {
+    font-weight: 500;
+    color: #212529;
+}
+
+.allocation-table .member-role {
+    font-size: 0.85em;
+    color: #6c757d;
+}
+
+.allocation-table input[type="number"] {
+    width: 60px;
+    padding: 4px 6px;
+    border: 1px solid #ced4da;
+    border-radius: 3px;
+    text-align: center;
+    font-size: 0.9em;
+}
+
+.allocation-table input[type="number"]:focus {
+    border-color: #80bdff;
+    outline: none;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+.allocation-table .row-total {
+    font-weight: bold;
+    text-align: center;
+    background: #f8f9fa;
+}
+
+.allocation-table .week-total {
+    font-weight: 500;
+    text-align: center;
+    background: #f8f9fa;
+    font-size: 0.9em;
+}
+
+.allocation-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.allocation-actions button {
+    padding: 8px 16px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.allocation-actions button:hover {
+    background: #f8f9fa;
+}
+
+.allocation-actions button.primary {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.allocation-actions button.primary:hover {
+    background: #218838;
+}
+
+.add-team-member {
+    margin-top: 15px;
+    padding: 15px;
+    background: #e7f3ff;
+    border: 1px solid #b8daff;
+    border-radius: 4px;
+}
+
+.add-team-member select {
+    width: 300px;
+    margin-right: 10px;
+}
+
+/* Remove action buttons from rows */
+.allocation-table .remove-member {
+    color: #dc3545;
+    cursor: pointer;
+    font-size: 1.1em;
+    padding: 0 5px;
+}
+
+.allocation-table .remove-member:hover {
+    color: #a71d2a;
+}
+
+/* Hide the default inline formsets */
+.inline-group.team-members-inline,
+.inline-group.allocations-inline {
+    display: none !important;
+}
+
+/* Status messages */
+.allocation-status {
+    margin-left: auto;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.allocation-status.success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.allocation-status.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Loading overlay */
+.allocation-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.allocation-loading-spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
