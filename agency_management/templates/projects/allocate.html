@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Allocate Team - {{ project.name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="py-6">
+                    <h1 class="text-3xl font-bold text-gray-900">Allocate Team to Project</h1>
+                    <p class="mt-2 text-gray-600">{{ project.name }} - {{ project.client.name }}</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Project Overview -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h2 class="text-xl font-semibold mb-4">Project Overview</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-600">Total Revenue</p>
+                        <p class="text-2xl font-bold text-green-600">${{ project.total_revenue|floatformat:0 }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Billable Rate</p>
+                        <p class="text-2xl font-bold text-blue-600">${{ project.billable_rate|floatformat:0 }}/hr</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Calculated Hours</p>
+                        <p class="text-2xl font-bold text-purple-600">{{ project.calculated_hours|floatformat:0 }} hrs</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Remaining Hours</p>
+                        <p class="text-2xl font-bold text-orange-600">{{ project.remaining_hours|floatformat:0 }} hrs</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Allocation Form -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Team Allocation</h2>
+                
+                <form method="post" action="{% url 'agency:project_allocate' project.id %}">
+                    {% csrf_token %}
+                    
+                    <!-- Allocation Mode -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Allocation Mode</label>
+                        <div class="space-x-4">
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="mode" value="overwrite" checked class="form-radio">
+                                <span class="ml-2">Overwrite existing allocations</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="mode" value="add" class="form-radio">
+                                <span class="ml-2">Add to existing allocations</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Team Members -->
+                    <div class="space-y-4">
+                        {% for member in team_members %}
+                        <div class="border rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="team_member" value="{{ member.id }}" 
+                                           id="member_{{ member.id }}" class="form-checkbox h-5 w-5 text-blue-600">
+                                    <label for="member_{{ member.id }}" class="ml-3">
+                                        <p class="font-medium">{{ member.user.get_full_name }}</p>
+                                        <p class="text-sm text-gray-600">
+                                            {{ member.get_role_display }} - ${{ member.hourly_rate|floatformat:0 }}/hr
+                                        </p>
+                                    </label>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <div>
+                                        <label class="text-sm text-gray-600">Hours</label>
+                                        <input type="number" name="hours_{{ member.id }}" 
+                                               class="w-20 border rounded px-2 py-1" min="0" step="0.5">
+                                    </div>
+                                    <div>
+                                        <label class="text-sm text-gray-600">Custom Rate</label>
+                                        <input type="number" name="rate_{{ member.id }}" 
+                                               class="w-24 border rounded px-2 py-1" 
+                                               placeholder="${{ project.billable_rate|floatformat:0 }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Month Selection -->
+                    <div class="mt-6 grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Year</label>
+                            <select name="year" class="mt-1 block w-full border rounded-md px-3 py-2">
+                                <option value="2025" selected>2025</option>
+                                <option value="2026">2026</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Month</label>
+                            <select name="month" class="mt-1 block w-full border rounded-md px-3 py-2">
+                                {% for i in "123456789"|make_list %}
+                                    <option value="{{ i }}">{{ i|date:"F" }}</option>
+                                {% endfor %}
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Submit -->
+                    <div class="mt-6 flex justify-between">
+                        <a href="{% url 'agency:project_detail' project.id %}" 
+                           class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600">
+                            Cancel
+                        </a>
+                        <button type="submit" 
+                                class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                            Save Allocations
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Current Allocations -->
+            {% if current_allocations %}
+            <div class="mt-6 bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Current Allocations</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead>
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Team Member
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Month
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Hours
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Rate
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Value
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for allocation in current_allocations %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {{ allocation.user_profile.user.get_full_name }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {{ allocation.month }}/{{ allocation.year }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {{ allocation.allocated_hours|floatformat:1 }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    ${{ allocation.effective_billable_rate|floatformat:0 }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap font-semibold">
+                                    ${{ allocation.allocation_value|floatformat:0 }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+    
+    <script>
+    // Auto-calculate remaining hours as allocations are entered
+    document.addEventListener('DOMContentLoaded', function() {
+        const hoursInputs = document.querySelectorAll('input[name^="hours_"]');
+        const remainingHoursEl = document.querySelector('.text-orange-600');
+        const totalHours = {{ project.calculated_hours|default:0 }};
+        
+        function updateRemaining() {
+            let allocatedTotal = 0;
+            hoursInputs.forEach(input => {
+                if (input.value) {
+                    allocatedTotal += parseFloat(input.value) || 0;
+                }
+            });
+            
+            const remaining = totalHours - allocatedTotal;
+            if (remainingHoursEl) {
+                remainingHoursEl.textContent = remaining.toFixed(0) + ' hrs';
+                remainingHoursEl.className = remaining < 0 ? 'text-2xl font-bold text-red-600' : 'text-2xl font-bold text-orange-600';
+            }
+        }
+        
+        hoursInputs.forEach(input => {
+            input.addEventListener('input', updateRemaining);
+        });
+    });
+    </script>
+</body>
+</html>

@@ -121,13 +121,6 @@ class Project(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
-    team_members = models.ManyToManyField(
-        'UserProfile',
-        related_name='assigned_projects',
-        blank=True,
-        help_text='Team members assigned to this project'
-    )
-
     def __str__(self):
         return f"{self.client.name} - {self.name}"
 

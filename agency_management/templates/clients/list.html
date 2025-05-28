@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clients - Agency Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-6">
+                    <div class="flex items-center">
+                        <a href="{% url 'agency:dashboard' %}" class="text-blue-600 hover:text-blue-800 mr-4">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                        <h1 class="text-3xl font-bold text-gray-900">Clients</h1>
+                        {% if company %}
+                            <span class="ml-4 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">{{ company.name }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex space-x-4">
+                        <a href="/admin/agency/client/add/" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                            <i class="fas fa-plus mr-2"></i>Add Client
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            
+            <!-- Clients List -->
+            <div class="bg-white shadow overflow-hidden sm:rounded-md">
+                <ul class="divide-y divide-gray-200">
+                    {% for client in clients %}
+                    <li>
+                        <div class="px-4 py-4 flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    {% if client.status == 'active' %}
+                                        <i class="fas fa-building text-green-500 text-xl"></i>
+                                    {% elif client.status == 'prospect' %}
+                                        <i class="fas fa-building text-yellow-500 text-xl"></i>
+                                    {% else %}
+                                        <i class="fas fa-building text-gray-500 text-xl"></i>
+                                    {% endif %}
+                                </div>
+                                <div class="ml-4">
+                                    <div class="flex items-center">
+                                        <div class="text-lg font-medium text-gray-900">
+                                            {{ client.name }}
+                                        </div>
+                                        <div class="ml-2 flex-shrink-0 flex">
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                {% if client.status == 'active' %}bg-green-100 text-green-800
+                                                {% elif client.status == 'prospect' %}bg-yellow-100 text-yellow-800
+                                                {% elif client.status == 'churned' %}bg-red-100 text-red-800
+                                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                                {{ client.get_status_display }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="text-sm text-gray-500">
+                                        {% if client.account_manager %}
+                                            <span>Account Manager: {{ client.account_manager.get_full_name|default:client.account_manager.username }}</span>
+                                            <span class="mx-2">•</span>
+                                        {% endif %}
+                                        <span>{{ client.projects.count }} project{{ client.projects.count|pluralize }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <a href="/admin/agency/project/?client__id__exact={{ client.id }}" 
+                                   class="text-green-600 hover:text-green-900 mr-3" title="View Projects">
+                                    <i class="fas fa-project-diagram"></i>
+                                </a>
+                                <a href="/admin/agency/client/{{ client.id }}/change/" 
+                                   class="text-blue-600 hover:text-blue-900" title="Edit Client">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </li>
+                    {% empty %}
+                    <li>
+                        <div class="px-4 py-8 text-center">
+                            <i class="fas fa-building text-gray-400 text-4xl mb-4"></i>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">No clients found</h3>
+                            <p class="text-gray-500 mb-4">Get started by adding your first client.</p>
+                            <a href="/admin/agency/client/add/" 
+                               class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                                <i class="fas fa-plus mr-2"></i>Add Client
+                            </a>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Summary Stats -->
+            {% if clients %}
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-blue-600">{{ clients|length }}</p>
+                        <p class="text-sm text-gray-600">Total Clients</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-green-600" id="activeClients">0</p>
+                        <p class="text-sm text-gray-600">Active Clients</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-yellow-600" id="prospectClients">0</p>
+                        <p class="text-sm text-gray-600">Prospects</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-purple-600" id="totalProjects">0</p>
+                        <p class="text-sm text-gray-600">Total Projects</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Client Status Breakdown -->
+            <div class="mt-6 bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Client Overview</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="text-center p-4 bg-green-50 rounded-lg">
+                        <div class="flex items-center justify-center mb-2">
+                            <i class="fas fa-check-circle text-green-500 text-2xl"></i>
+                        </div>
+                        <p class="text-2xl font-bold text-green-600" id="activeCount">0</p>
+                        <p class="text-sm text-gray-600">Active</p>
+                    </div>
+                    <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                        <div class="flex items-center justify-center mb-2">
+                            <i class="fas fa-clock text-yellow-500 text-2xl"></i>
+                        </div>
+                        <p class="text-2xl font-bold text-yellow-600" id="prospectCount">0</p>
+                        <p class="text-sm text-gray-600">Prospects</p>
+                    </div>
+                    <div class="text-center p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-center mb-2">
+                            <i class="fas fa-pause-circle text-gray-500 text-2xl"></i>
+                        </div>
+                        <p class="text-2xl font-bold text-gray-600" id="inactiveCount">0</p>
+                        <p class="text-sm text-gray-600">Inactive</p>
+                    </div>
+                    <div class="text-center p-4 bg-red-50 rounded-lg">
+                        <div class="flex items-center justify-center mb-2">
+                            <i class="fas fa-times-circle text-red-500 text-2xl"></i>
+                        </div>
+                        <p class="text-2xl font-bold text-red-600" id="churnedCount">0</p>
+                        <p class="text-sm text-gray-600">Churned</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Top Clients by Projects -->
+            <div class="mt-6 bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Most Active Clients</h3>
+                <div class="space-y-3" id="topClients">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Client data from Django template
+        const clients = [
+            {% for client in clients %}
+            {
+                id: '{{ client.id }}',
+                name: '{{ client.name|escapejs }}',
+                status: '{{ client.status }}',
+                projectCount: {{ client.projects.count|default:0 }}
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        // Calculate status counts
+        let statusCounts = {
+            active: 0,
+            prospect: 0,
+            inactive: 0,
+            churned: 0
+        };
+        let totalProjects = 0;
+        
+        clients.forEach(client => {
+            totalProjects += client.projectCount;
+            if (statusCounts.hasOwnProperty(client.status)) {
+                statusCounts[client.status]++;
+            }
+        });
+        
+        // Update the DOM
+        document.getElementById('activeClients').textContent = statusCounts.active;
+        document.getElementById('prospectClients').textContent = statusCounts.prospect;
+        document.getElementById('totalProjects').textContent = totalProjects;
+        
+        document.getElementById('activeCount').textContent = statusCounts.active;
+        document.getElementById('prospectCount').textContent = statusCounts.prospect;
+        document.getElementById('inactiveCount').textContent = statusCounts.inactive;
+        document.getElementById('churnedCount').textContent = statusCounts.churned;
+        
+        // Show top 5 clients by project count
+        const topClientsDiv = document.getElementById('topClients');
+        if (topClientsDiv) {
+            const sortedClients = clients
+                .filter(c => c.projectCount > 0)
+                .sort((a, b) => b.projectCount - a.projectCount)
+                .slice(0, 5);
+            
+            if (sortedClients.length > 0) {
+                sortedClients.forEach((client, index) => {
+                    const clientDiv = document.createElement('div');
+                    clientDiv.className = 'flex items-center justify-between p-3 bg-gray-50 rounded';
+                    clientDiv.innerHTML = `
+                        <div class="flex items-center">
+                            <span class="text-lg font-bold text-gray-400 mr-3">#${index + 1}</span>
+                            <div>
+                                <p class="font-medium text-gray-900">${client.name}</p>
+                                <p class="text-sm text-gray-500">${client.projectCount} project${client.projectCount !== 1 ? 's' : ''}</p>
+                            </div>
+                        </div>
+                        <a href="/admin/agency/project/?client__id__exact=${client.id}" 
+                           class="text-blue-600 hover:text-blue-900">
+                            <i class="fas fa-arrow-right"></i>
+                        </a>
+                    `;
+                    topClientsDiv.appendChild(clientDiv);
+                });
+            } else {
+                topClientsDiv.innerHTML = '<p class="text-gray-500 text-center">No clients with projects yet</p>';
+            }
+        }
+    });
+    </script>
+</body>
+</html>

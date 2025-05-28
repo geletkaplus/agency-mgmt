@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Members - Agency Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-6">
+                    <div class="flex items-center">
+                        <a href="{% url 'agency:dashboard' %}" class="text-blue-600 hover:text-blue-800 mr-4">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                        <h1 class="text-3xl font-bold text-gray-900">Team Members</h1>
+                        {% if company %}
+                            <span class="ml-4 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">{{ company.name }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex space-x-4">
+                        <a href="/admin/agency/userprofile/add/" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                            <i class="fas fa-plus mr-2"></i>Add Team Member
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            
+            <!-- Filter Tabs -->
+            <div class="mb-6">
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8">
+                        <a href="{% url 'agency:team_list' %}" 
+                           class="border-blue-500 text-blue-600 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                            All Team Members
+                        </a>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Team Members Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for member in team_members %}
+                <div class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow">
+                    <div class="p-6">
+                        <!-- Member Header -->
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-{{ member.role|slice:":1"|lower }}{{ member.role|slice:"1:2"|lower }}-500 rounded-full flex items-center justify-center text-white font-semibold">
+                                {{ member.user.first_name|slice:":1" }}{{ member.user.last_name|slice:":1" }}
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-semibold text-gray-900">
+                                    {{ member.user.get_full_name|default:member.user.username }}
+                                </h3>
+                                <p class="text-sm text-gray-500">{{ member.user.email }}</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Member Details -->
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Role:</span>
+                                <span class="px-2 py-1 text-xs font-medium rounded-full 
+                                    {% if member.role == 'tech' %}bg-blue-100 text-blue-800
+                                    {% elif member.role == 'creative' %}bg-purple-100 text-purple-800
+                                    {% elif member.role == 'account' %}bg-green-100 text-green-800
+                                    {% elif member.role == 'media' %}bg-yellow-100 text-yellow-800
+                                    {% elif member.role == 'leadership' %}bg-red-100 text-red-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ member.get_role_display }}
+                                </span>
+                            </div>
+                            
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Status:</span>
+                                <span class="px-2 py-1 text-xs font-medium rounded-full 
+                                    {% if member.status == 'full_time' %}bg-green-100 text-green-800
+                                    {% elif member.status == 'part_time' %}bg-blue-100 text-blue-800
+                                    {% elif member.status == 'contractor' %}bg-yellow-100 text-yellow-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ member.get_status_display }}
+                                </span>
+                            </div>
+                            
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Hourly Rate:</span>
+                                <span class="text-sm font-medium text-gray-900">${{ member.hourly_rate|floatformat:0 }}/hr</span>
+                            </div>
+                            
+                            {% if member.annual_salary %}
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Annual Salary:</span>
+                                <span class="text-sm font-medium text-gray-900">${{ member.annual_salary|floatformat:0 }}</span>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Capacity:</span>
+                                <span class="text-sm font-medium text-gray-900">{{ member.weekly_capacity_hours|floatformat:0 }} hrs/week</span>
+                            </div>
+                            
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Target Utilization:</span>
+                                <span class="text-sm font-medium text-gray-900">{{ member.utilization_target|floatformat:0 }}%</span>
+                            </div>
+                            
+                            {% if member.start_date %}
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Start Date:</span>
+                                <span class="text-sm text-gray-900">{{ member.start_date|date:"M d, Y" }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <div class="flex justify-between">
+                                <a href="/admin/agency/userprofile/{{ member.id }}/change/" 
+                                   class="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                                    <i class="fas fa-edit mr-1"></i>Edit
+                                </a>
+                                <a href="/admin/agency/projectallocation/?user_profile__id__exact={{ member.id }}" 
+                                   class="text-green-600 hover:text-green-900 text-sm font-medium">
+                                    <i class="fas fa-calendar mr-1"></i>View Allocations
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-span-full">
+                    <div class="bg-white rounded-lg shadow p-8 text-center">
+                        <i class="fas fa-users text-gray-400 text-4xl mb-4"></i>
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">No team members found</h3>
+                        <p class="text-gray-500 mb-4">Get started by adding your first team member.</p>
+                        <a href="/admin/agency/userprofile/add/" 
+                           class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 inline-block">
+                            <i class="fas fa-plus mr-2"></i>Add Team Member
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Summary Stats -->
+            {% if team_members %}
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-blue-600">{{ team_members|length }}</p>
+                        <p class="text-sm text-gray-600">Total Team Members</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-green-600">
+                            <span id="totalCapacity">0</span>
+                        </p>
+                        <p class="text-sm text-gray-600">Total Weekly Hours</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-purple-600">
+                            <span id="avgRate">$0</span>
+                        </p>
+                        <p class="text-sm text-gray-600">Average Hourly Rate</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-orange-600">
+                            <span id="monthlyPayroll">$0</span>
+                        </p>
+                        <p class="text-sm text-gray-600">Monthly Payroll</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Role Distribution -->
+            <div class="mt-6 bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Team Composition</h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    {% regroup team_members by role as role_list %}
+                    {% for role_group in role_list %}
+                    <div class="text-center">
+                        <p class="text-2xl font-bold 
+                            {% if role_group.grouper == 'tech' %}text-blue-600
+                            {% elif role_group.grouper == 'creative' %}text-purple-600
+                            {% elif role_group.grouper == 'account' %}text-green-600
+                            {% elif role_group.grouper == 'media' %}text-yellow-600
+                            {% elif role_group.grouper == 'leadership' %}text-red-600
+                            {% else %}text-gray-600{% endif %}">
+                            {{ role_group.list|length }}
+                        </p>
+                        <p class="text-sm text-gray-600">{{ role_group.list.0.get_role_display }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Calculate totals
+        const teamData = [
+            {% for member in team_members %}
+            {
+                capacity: {{ member.weekly_capacity_hours|default:0 }},
+                rate: {{ member.hourly_rate|default:0 }},
+                salary: {{ member.annual_salary|default:0 }}
+            },
+            {% endfor %}
+        ];
+        
+        // Total capacity
+        const totalCapacity = teamData.reduce((sum, member) => sum + member.capacity, 0);
+        document.getElementById('totalCapacity').textContent = Math.round(totalCapacity);
+        
+        // Average rate
+        const avgRate = teamData.length > 0 ? 
+            teamData.reduce((sum, member) => sum + member.rate, 0) / teamData.length : 0;
+        document.getElementById('avgRate').textContent = 
+            new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(avgRate);
+        
+        // Monthly payroll (using salary if available, otherwise hourly * capacity * 4.33)
+        const monthlyPayroll = teamData.reduce((sum, member) => {
+            if (member.salary > 0) {
+                return sum + (member.salary / 12);
+            } else {
+                return sum + (member.rate * member.capacity * 4.33);
+            }
+        }, 0);
+        document.getElementById('monthlyPayroll').textContent = 
+            new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(monthlyPayroll);
+    });
+    </script>
+</body>
+</html>
