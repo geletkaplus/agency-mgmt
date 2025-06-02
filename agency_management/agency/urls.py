@@ -1,3 +1,5 @@
+# Update your agency/urls.py file to include this new endpoint
+
 # agency/urls.py - Updated URLs
 from django.urls import path
 from . import views
@@ -28,5 +30,6 @@ urlpatterns = [
     # API endpoints
     path('api/revenue-chart/', views.revenue_chart_data, name='revenue_chart_data'),
     path('api/capacity-chart/', views.capacity_chart_data, name='capacity_chart_data'),
+    path('api/dashboard-data/', views.dashboard_data_api, name='dashboard_data_api'),  # NEW ENDPOINT
     path('api/health/', views.health_check, name='health_check'),
 ]

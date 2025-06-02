@@ -1,7 +1,7 @@
-# agency/views.py - Fixed with proper imports and user toggle
+# agency/views.py - Complete updated views with proper detail pages
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
-from django.db.models import Sum, Q, Count, F
+from django.db.models import Sum, Q, Count, F, Avg
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -9,6 +9,13 @@ from datetime import datetime, date
 from decimal import Decimal
 import json
 import calendar
+
+# Import all models
+from .models import (
+    Company, UserProfile, Client, Project, ProjectAllocation, 
+    MonthlyRevenue, Expense, ContractorExpense, Cost, CapacitySnapshot
+)
+
 
 # Import all models
 from .models import (
@@ -755,15 +762,43 @@ def health_check(request):
     """Simple health check endpoint"""
     return JsonResponse({'status': 'ok', 'timestamp': datetime.now().isoformat()})
 
-# Additional view stubs for URLs
+# Detail view implementations
+@login_required
 def client_detail(request, client_id):
-    """Client detail view"""
-    return JsonResponse({'error': 'Not implemented yet'})
+    """Client detail view with projects"""
+    client = get_object_or_404(Client, id=client_id)
+    projects = client.projects.all().order_by('-created_at')
+    
+    context = {
+        'client': client,
+        'projects': projects,
+    }
+    
+    return render(request, 'clients/detail.html', context)
 
+@login_required
 def project_detail(request, project_id):
-    """Project detail view"""
-    return JsonResponse({'error': 'Not implemented yet'})
+    """Project detail view with allocations"""
+    project = get_object_or_404(Project, id=project_id)
+    allocations = ProjectAllocation.objects.filter(project=project).select_related(
+        'user_profile', 'user_profile__user'
+    ).order_by('year', 'month', 'user_profile__user__last_name')
+    
+    # Calculate team size
+    if hasattr(project, 'team_members'):
+        team_size = project.team_members.count()
+    else:
+        team_size = allocations.values('user_profile').distinct().count()
+    
+    context = {
+        'project': project,
+        'allocations': allocations,
+        'team_size': team_size,
+    }
+    
+    return render(request, 'projects/detail.html', context)
 
+@login_required
 def import_data(request):
     """Import data from spreadsheet"""
     return JsonResponse({'error': 'Not implemented yet'})
@@ -771,3 +806,514 @@ def import_data(request):
 def capacity_chart_data(request):
     """API endpoint for capacity chart data"""
     return JsonResponse({'error': 'Not implemented yet'})
+
+# Enhanced Dashboard Data API
+@login_required
+def dashboard_data(request):
+    """API endpoint for dynamic dashboard data based on date range"""
+    try:
+        company = Company.objects.first()
+        if not company:
+            return JsonResponse({'error': 'No company found'}, status=404)
+        
+        # Get date range parameters
+        start_date_str = request.GET.get('start_date')
+        end_date_str = request.GET.get('end_date')
+        aggregation = request.GET.get('aggregation', 'monthly')
+        
+        if not start_date_str or not end_date_str:
+            return JsonResponse({'error': 'Start and end dates required'}, status=400)
+        
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        
+        # Calculate metrics for the date range
+        data = calculate_period_metrics(company, start_date, end_date, aggregation)
+        
+        return JsonResponse(data)
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+def calculate_period_metrics(company, start_date, end_date, aggregation='monthly'):
+    """Calculate comprehensive metrics for a given period"""
+    
+    # Initialize totals
+    total_booked_revenue = Decimal('0')
+    total_forecast_revenue = Decimal('0')
+    total_costs = Decimal('0')
+    total_payroll_costs = Decimal('0')
+    total_other_costs = Decimal('0')
+    total_capacity_hours = Decimal('0')
+    total_allocated_hours = Decimal('0')
+    
+    # Get the date range for iteration
+    current_date = start_date.replace(day=1)  # Start at beginning of month
+    end_month = end_date.replace(day=1)
+    
+    while current_date <= end_month:
+        year = current_date.year
+        month = current_date.month
+        
+        # Calculate revenue for this month
+        month_revenue = calculate_monthly_revenue(company, year, month)
+        total_booked_revenue += month_revenue['booked']
+        total_forecast_revenue += month_revenue['forecast']
+        
+        # Calculate costs for this month
+        month_costs = calculate_monthly_operating_costs(company, year, month)
+        total_costs += month_costs
+        
+        # Get detailed cost breakdown
+        cost_breakdown = get_monthly_cost_breakdown(company, year, month)
+        total_payroll_costs += cost_breakdown['payroll']
+        total_other_costs += cost_breakdown['other']
+        
+        # Calculate capacity and utilization
+        capacity_data = calculate_monthly_capacity(company, year, month)
+        total_capacity_hours += capacity_data['capacity']
+        total_allocated_hours += capacity_data['allocated']
+        
+        # Move to next month
+        if current_date.month == 12:
+            current_date = current_date.replace(year=current_date.year + 1, month=1)
+        else:
+            current_date = current_date.replace(month=current_date.month + 1)
+    
+    # Calculate derived metrics
+    total_revenue = total_booked_revenue + total_forecast_revenue
+    total_profit = total_revenue - total_costs
+    profit_margin = (float(total_profit) / float(total_revenue) * 100) if total_revenue > 0 else 0
+    utilization_rate = (float(total_allocated_hours) / float(total_capacity_hours) * 100) if total_capacity_hours > 0 else 0
+    
+    # Calculate average project value
+    projects_in_period = Project.objects.filter(
+        company=company,
+        start_date__lte=end_date,
+        end_date__gte=start_date
+    )
+    avg_project_value = projects_in_period.aggregate(
+        avg=Sum('total_revenue')
+    )['avg'] or 0
+    if projects_in_period.count() > 0:
+        avg_project_value = avg_project_value / projects_in_period.count()
+    
+    return {
+        'revenue': float(total_revenue),
+        'booked_revenue': float(total_booked_revenue),
+        'forecast_revenue': float(total_forecast_revenue),
+        'costs': float(total_costs),
+        'payroll_costs': float(total_payroll_costs),
+        'other_costs': float(total_other_costs),
+        'profit': float(total_profit),
+        'profit_margin': profit_margin,
+        'capacity': float(total_capacity_hours),
+        'allocated_hours': float(total_allocated_hours),
+        'utilization_rate': utilization_rate,
+        'avg_project_value': float(avg_project_value),
+        'period_start': start_date.isoformat(),
+        'period_end': end_date.isoformat()
+    }
+
+def calculate_monthly_revenue(company, year, month):
+    """Calculate booked and forecast revenue for a specific month"""
+    
+    # Try MonthlyRevenue table first
+    monthly_revenues = MonthlyRevenue.objects.filter(
+        company=company,
+        year=year,
+        month=month
+    ).aggregate(
+        booked=Sum('revenue', filter=Q(revenue_type='booked')),
+        forecast=Sum('revenue', filter=Q(revenue_type='forecast'))
+    )
+    
+    booked = monthly_revenues['booked'] or Decimal('0')
+    forecast = monthly_revenues['forecast'] or Decimal('0')
+    
+    # If no data in MonthlyRevenue, calculate from projects
+    if booked == 0 and forecast == 0:
+        month_start = date(year, month, 1)
+        month_end = date(year, month, calendar.monthrange(year, month)[1])
+        
+        projects = Project.objects.filter(
+            company=company,
+            start_date__lte=month_end,
+            end_date__gte=month_start
+        )
+        
+        for project in projects:
+            try:
+                revenue_type = getattr(project, 'revenue_type', 'booked')
+                
+                # Calculate what portion of this project falls in this month
+                project_start = max(project.start_date, month_start)
+                project_end = min(project.end_date, month_end)
+                
+                if project_start <= project_end:
+                    # Calculate total project duration in months
+                    total_months = ((project.end_date.year - project.start_date.year) * 12 + 
+                                  project.end_date.month - project.start_date.month + 1)
+                    
+                    if total_months > 0:
+                        monthly_amount = project.total_revenue / total_months
+                        
+                        if revenue_type == 'forecast':
+                            forecast += monthly_amount
+                        else:
+                            booked += monthly_amount
+                            
+            except Exception:
+                continue
+    
+    return {
+        'booked': booked,
+        'forecast': forecast
+    }
+
+def get_monthly_cost_breakdown(company, year, month):
+    """Get detailed breakdown of monthly costs"""
+    
+    payroll_costs = Decimal('0')
+    other_costs = Decimal('0')
+    
+    # Calculate payroll costs from team members
+    team_members = UserProfile.objects.filter(
+        company=company,
+        status__in=['full_time', 'part_time']
+    ).filter(
+        Q(start_date__lte=date(year, month, 1)) | Q(start_date__isnull=True)
+    ).filter(
+        Q(end_date__gte=date(year, month, 1)) | Q(end_date__isnull=True)
+    )
+    
+    for member in team_members:
+        payroll_costs += member.monthly_salary_cost
+    
+    # Get other costs
+    try:
+        month_start = date(year, month, 1)
+        month_end = date(year, month, calendar.monthrange(year, month)[1])
+        
+        costs_this_month = Cost.objects.filter(
+            company=company,
+            start_date__lte=month_end,
+            is_active=True
+        ).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=month_start)
+        )
+        
+        for cost in costs_this_month:
+            if cost.cost_type != 'payroll':
+                other_costs += cost.monthly_amount
+                
+    except:
+        # Use legacy models if Cost doesn't exist
+        expenses = Expense.objects.filter(
+            company=company,
+            is_active=True
+        )
+        for expense in expenses:
+            other_costs += expense.monthly_amount
+        
+        contractor_expenses = ContractorExpense.objects.filter(
+            company=company,
+            year=year,
+            month=month
+        )
+        for expense in contractor_expenses:
+            other_costs += expense.amount
+    
+    return {
+        'payroll': payroll_costs,
+        'other': other_costs
+    }
+
+def calculate_monthly_capacity(company, year, month):
+    """Calculate team capacity and allocation for a specific month"""
+    
+    # Get active team members for this month
+    team_members = UserProfile.objects.filter(
+        company=company,
+        status__in=['full_time', 'part_time']
+    ).filter(
+        Q(start_date__lte=date(year, month, 1)) | Q(start_date__isnull=True)
+    ).filter(
+        Q(end_date__gte=date(year, month, 1)) | Q(end_date__isnull=True)
+    )
+    
+    total_capacity = sum(
+        float(member.weekly_capacity_hours) * 4.33  # Convert to monthly
+        for member in team_members
+    )
+    
+    # Get allocations for this month
+    allocated_hours = ProjectAllocation.objects.filter(
+        project__company=company,
+        year=year,
+        month=month
+    ).aggregate(total=Sum('allocated_hours'))['total'] or 0
+    
+    return {
+        'capacity': Decimal(str(total_capacity)),
+        'allocated': Decimal(str(allocated_hours))
+    }
+
+# Add this to your agency/views.py file after the existing views
+
+@login_required
+def dashboard_data_api(request):
+    """API endpoint for dynamic dashboard data based on date range"""
+    try:
+        company = Company.objects.first()
+        if not company:
+            return JsonResponse({'error': 'No company found'}, status=404)
+        
+        # Get date range from request
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        aggregation = request.GET.get('aggregation', 'monthly')
+        
+        if not start_date or not end_date:
+            return JsonResponse({'error': 'Missing date parameters'}, status=400)
+        
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        
+        # Calculate metrics for the date range
+        revenue_data = calculate_period_revenue(company, start_date, end_date)
+        costs_data = calculate_period_costs(company, start_date, end_date)
+        capacity_data = calculate_period_capacity(company, start_date, end_date)
+        
+        # Calculate profit
+        profit = revenue_data['total'] - costs_data['total']
+        profit_margin = (profit / revenue_data['total'] * 100) if revenue_data['total'] > 0 else 0
+        
+        # Calculate average project value
+        projects_in_period = Project.objects.filter(
+            company=company,
+            start_date__lte=end_date,
+            end_date__gte=start_date
+        )
+        
+        avg_project_value = 0
+        if projects_in_period.exists():
+            total_value = projects_in_period.aggregate(Sum('total_revenue'))['total_revenue__sum'] or 0
+            avg_project_value = float(total_value) / projects_in_period.count()
+        
+        response_data = {
+            'revenue': float(revenue_data['total']),
+            'booked_revenue': float(revenue_data['booked']),
+            'forecast_revenue': float(revenue_data['forecast']),
+            'costs': float(costs_data['total']),
+            'payroll_costs': float(costs_data['payroll']),
+            'contractor_costs': float(costs_data['contractor']),
+            'other_costs': float(costs_data['other']),
+            'profit': float(profit),
+            'profit_margin': float(profit_margin),
+            'capacity': float(capacity_data['total_capacity']),
+            'allocated_hours': float(capacity_data['allocated_hours']),
+            'utilization_rate': float(capacity_data['utilization_rate']),
+            'avg_project_value': float(avg_project_value),
+            'period': {
+                'start': start_date.isoformat(),
+                'end': end_date.isoformat(),
+                'aggregation': aggregation
+            }
+        }
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def calculate_period_revenue(company, start_date, end_date):
+    """Calculate revenue for a specific period"""
+    booked_revenue = Decimal('0')
+    forecast_revenue = Decimal('0')
+    
+    # Get revenue from MonthlyRevenue table
+    monthly_revenues = MonthlyRevenue.objects.filter(
+        company=company,
+        year__gte=start_date.year,
+        year__lte=end_date.year
+    )
+    
+    for revenue in monthly_revenues:
+        # Check if this month falls within our date range
+        month_start = date(revenue.year, revenue.month, 1)
+        month_end = date(revenue.year, revenue.month, calendar.monthrange(revenue.year, revenue.month)[1])
+        
+        if month_start <= end_date and month_end >= start_date:
+            if revenue.revenue_type == 'booked':
+                booked_revenue += revenue.revenue
+            else:
+                forecast_revenue += revenue.revenue
+    
+    # Also calculate from projects
+    projects = Project.objects.filter(
+        company=company,
+        start_date__lte=end_date,
+        end_date__gte=start_date
+    )
+    
+    for project in projects:
+        # Calculate proportion of project in this period
+        project_start = max(project.start_date, start_date)
+        project_end = min(project.end_date, end_date)
+        
+        if project_start <= project_end:
+            total_days = (project.end_date - project.start_date).days + 1
+            period_days = (project_end - project_start).days + 1
+            
+            if total_days > 0:
+                proportion = Decimal(period_days) / Decimal(total_days)
+                project_revenue = project.total_revenue * proportion
+                
+                if hasattr(project, 'revenue_type'):
+                    if project.revenue_type == 'forecast':
+                        forecast_revenue += project_revenue
+                    else:
+                        booked_revenue += project_revenue
+                else:
+                    booked_revenue += project_revenue
+    
+    return {
+        'total': booked_revenue + forecast_revenue,
+        'booked': booked_revenue,
+        'forecast': forecast_revenue
+    }
+
+
+def calculate_period_costs(company, start_date, end_date):
+    """Calculate costs for a specific period"""
+    payroll_costs = Decimal('0')
+    contractor_costs = Decimal('0')
+    other_costs = Decimal('0')
+    
+    # Calculate number of months in period
+    months_in_period = 0
+    current_date = start_date.replace(day=1)
+    while current_date <= end_date:
+        months_in_period += 1
+        if current_date.month == 12:
+            current_date = current_date.replace(year=current_date.year + 1, month=1)
+        else:
+            current_date = current_date.replace(month=current_date.month + 1)
+    
+    # Calculate payroll costs
+    team_members = UserProfile.objects.filter(
+        company=company,
+        status__in=['full_time', 'part_time']
+    ).filter(
+        Q(start_date__lte=end_date) | Q(start_date__isnull=True)
+    ).filter(
+        Q(end_date__gte=start_date) | Q(end_date__isnull=True)
+    )
+    
+    for member in team_members:
+        payroll_costs += member.monthly_salary_cost * months_in_period
+    
+    # Try Cost model
+    try:
+        costs = Cost.objects.filter(
+            company=company,
+            start_date__lte=end_date,
+            is_active=True
+        ).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=start_date)
+        )
+        
+        for cost in costs:
+            monthly_amount = cost.monthly_amount * months_in_period
+            if cost.is_contractor:
+                contractor_costs += monthly_amount
+            elif cost.cost_type != 'payroll':
+                other_costs += monthly_amount
+    except:
+        # Use legacy models
+        expenses = Expense.objects.filter(
+            company=company,
+            is_active=True,
+            start_date__lte=end_date
+        ).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=start_date)
+        )
+        
+        for expense in expenses:
+            other_costs += expense.monthly_amount * months_in_period
+        
+        # Calculate contractor expenses for each month in range
+        current_date = start_date
+        while current_date <= end_date:
+            contractor_expenses = ContractorExpense.objects.filter(
+                company=company,
+                year=current_date.year,
+                month=current_date.month
+            )
+            for expense in contractor_expenses:
+                contractor_costs += expense.amount
+            
+            if current_date.month == 12:
+                current_date = current_date.replace(year=current_date.year + 1, month=1, day=1)
+            else:
+                current_date = current_date.replace(month=current_date.month + 1, day=1)
+    
+    return {
+        'total': payroll_costs + contractor_costs + other_costs,
+        'payroll': payroll_costs,
+        'contractor': contractor_costs,
+        'other': other_costs
+    }
+
+
+def calculate_period_capacity(company, start_date, end_date):
+    """Calculate capacity metrics for a specific period"""
+    # Get team members
+    team_members = UserProfile.objects.filter(
+        company=company,
+        status__in=['full_time', 'part_time']
+    ).filter(
+        Q(start_date__lte=end_date) | Q(start_date__isnull=True)
+    ).filter(
+        Q(end_date__gte=start_date) | Q(end_date__isnull=True)
+    )
+    
+    # Calculate working days in period
+    working_days = 0
+    current_date = start_date
+    while current_date <= end_date:
+        if current_date.weekday() < 5:  # Monday = 0, Friday = 4
+            working_days += 1
+        current_date += timedelta(days=1)
+    
+    # Calculate total capacity (8 hours per working day per team member)
+    total_capacity = Decimal(working_days * 8 * team_members.count())
+    
+    # Get allocations in period
+    allocations = ProjectAllocation.objects.filter(
+        project__company=company,
+        year__gte=start_date.year,
+        year__lte=end_date.year
+    )
+    
+    allocated_hours = Decimal('0')
+    for allocation in allocations:
+        # Check if this allocation month falls within our date range
+        alloc_month_start = date(allocation.year, allocation.month, 1)
+        if start_date <= alloc_month_start <= end_date:
+            allocated_hours += allocation.allocated_hours
+    
+    utilization_rate = (float(allocated_hours) / float(total_capacity) * 100) if total_capacity > 0 else 0
+    
+    return {
+        'total_capacity': total_capacity,
+        'allocated_hours': allocated_hours,
+        'utilization_rate': utilization_rate,
+        'team_count': team_members.count()
+    }
+
+
