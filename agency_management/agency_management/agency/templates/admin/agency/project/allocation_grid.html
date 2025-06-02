@@ -1,0 +1,15 @@
+{% load static %}
+<div class="allocation-grid">
+    <h2>Team Member Allocations</h2>
+    <p class="help">Allocate hours to team members for each month of the project.</p>
+    
+    <div id="allocation-container">
+        <!-- Allocation grid will be loaded here -->
+        <p>Save the project to see the allocation grid.</p>
+    </div>
+    
+    <script>
+    // This will be populated by the admin view
+    const projectId = '{{ project.id }}';
+    </script>
+</div>

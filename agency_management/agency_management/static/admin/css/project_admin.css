@@ -1,0 +1,24 @@
+/* Custom styles for project admin */
+.allocation-grid {
+    overflow-x: auto;
+}
+
+.allocation-grid table {
+    min-width: 100%;
+}
+
+.allocation-grid input[type="number"] {
+    width: 60px;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+.allocation-grid .team-member-row:hover {
+    background-color: #f5f5f5;
+}
+
+.allocation-total {
+    font-weight: bold;
+    background-color: #f0f0f0;
+}
