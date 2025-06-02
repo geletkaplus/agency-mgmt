@@ -102,8 +102,7 @@ class ProjectAdmin(admin.ModelAdmin):
     search_fields = ['name', 'client__name']
     date_hierarchy = 'start_date'
     autocomplete_fields = ['client', 'project_manager']
-    filter_horizontal = ['team_members']  # Better UI for M2M field
-    
+        
     fieldsets = (
         ('Project Information', {
             'fields': ('name', 'client', 'company', 'project_type', 'status')
@@ -293,32 +292,38 @@ class ProjectAdmin(admin.ModelAdmin):
                 # Clear existing allocations for this project
                 ProjectAllocation.objects.filter(project=project).delete()
                 
-                # Group allocations by member/month and sum the hours
-                monthly_totals = {}
+                # Process allocations
                 for alloc in allocations:
-                    key = (alloc['member_id'], alloc['year'], alloc['month'])
-                    if key not in monthly_totals:
-                        monthly_totals[key] = 0
-                    monthly_totals[key] += float(alloc['hours'])
-                
-                # Create allocations
-                for (member_id, year, month), hours in monthly_totals.items():
-                    if hours > 0:
-                        member = UserProfile.objects.get(id=member_id)
-                        ProjectAllocation.objects.create(
-                            project=project,
-                            user_profile=member,
-                            year=year,
-                            month=month,
-                            allocated_hours=hours,
-                            hourly_rate=member.hourly_rate
-                        )
+                    try:
+                        member_id = alloc.get('member_id')
+                        year = int(alloc.get('year', 0))
+                        month = int(alloc.get('month', 0))
+                        hours = float(alloc.get('hours', 0))
+                        
+                        if hours > 0 and member_id and year and month:
+                            member = UserProfile.objects.get(id=member_id)
+                            
+                            # Create allocation for this specific month
+                            ProjectAllocation.objects.create(
+                                project=project,
+                                user_profile=member,
+                                year=year,
+                                month=month,
+                                allocated_hours=Decimal(str(hours)),
+                                hourly_rate=member.hourly_rate
+                            )
+                    except Exception as e:
+                        print(f"Error creating allocation: {e}")
+                        continue
                 
                 return JsonResponse({'status': 'success'})
             except Exception as e:
-                return JsonResponse({'status': 'error', 'message': str(e)})
+                print(f"Error in save_allocations_view: {e}")
+                import traceback
+                traceback.print_exc()
+                return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
         
-        return JsonResponse({'status': 'error', 'message': 'Invalid request'})
+        return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
 @admin.register(ProjectAllocation)
 class ProjectAllocationAdmin(admin.ModelAdmin):
     list_display = ['project', 'user_profile', 'month_year', 'allocated_hours']

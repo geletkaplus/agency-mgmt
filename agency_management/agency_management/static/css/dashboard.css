@@ -1,0 +1,20 @@
+/* Date range picker styles */
+.date-range-controls input[type="date"] {
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.date-range-controls input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+}
+
+.range-btn.active {
+    background-color: #3b82f6 !important;
+    color: white !important;
+    border-color: #3b82f6 !important;
+}
+
+/* Chart loading state */
+#revenueChart {
+    transition: opacity 0.3s ease;
+}

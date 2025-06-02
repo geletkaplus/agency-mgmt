@@ -41,18 +41,33 @@
         margin-top: 2rem;
         height: 400px;
     }
-    .filter-controls {
+    .date-range-controls {
         display: flex;
         gap: 1rem;
         align-items: center;
         margin-bottom: 1rem;
     }
-    .filter-controls select {
+    .date-range-controls input[type="date"] {
+        padding: 0.5rem 1rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: white;
+    }
+    .date-range-controls button {
         padding: 0.5rem 1rem;
         border: 1px solid #ddd;
         border-radius: 4px;
         background: white;
         cursor: pointer;
+        transition: all 0.2s;
+    }
+    .date-range-controls button:hover {
+        background: #f3f4f6;
+    }
+    .date-range-controls button.active {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
     }
     .user-switcher {
         position: relative;
@@ -194,19 +209,16 @@
 
     <!-- Revenue Chart -->
     <div class="chart-container">
-        <div class="filter-controls">
+        <div class="date-range-controls">
             <h2 class="text-xl font-bold">Revenue & Operating Expenses</h2>
-            <select id="yearFilter" class="ml-auto">
-                <option value="2023" {% if current_year == 2023 %}selected{% endif %}>2023</option>
-                <option value="2024" {% if current_year == 2024 %}selected{% endif %}>2024</option>
-                <option value="2025" {% if current_year == 2025 %}selected{% endif %}>2025</option>
-                <option value="2026" {% if current_year == 2026 %}selected{% endif %}>2026</option>
-            </select>
-            <select id="viewFilter">
-                <option value="combined">Combined View</option>
-                <option value="stacked">Stacked View</option>
-                <option value="separate">Separate Lines</option>
-            </select>
+            <div class="ml-auto flex gap-2">
+                <button onclick="setDateRange('ytd')" class="range-btn" data-range="ytd">YTD</button>
+                <button onclick="setDateRange('last12')" class="range-btn" data-range="last12">Last 12 Months</button>
+                <button onclick="setDateRange('custom')" class="range-btn" data-range="custom">Custom</button>
+                <input type="date" id="startDate" style="display:none;">
+                <input type="date" id="endDate" style="display:none;">
+                <button onclick="updateChart()" id="updateBtn" style="display:none; background:#3b82f6; color:white;">Update</button>
+            </div>
         </div>
         <canvas id="revenueChart" style="max-height: 300px;"></canvas>
     </div>
@@ -230,18 +242,64 @@
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
 <script>
 // Global chart variable
 let revenueChart = null;
+let currentRange = 'ytd';
 
 // Initialize chart when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    initializeChart();
+    // Set initial date range to YTD
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
     
-    // Add event listeners for filters
-    document.getElementById('yearFilter').addEventListener('change', updateChart);
-    document.getElementById('viewFilter').addEventListener('change', updateChart);
+    document.getElementById('startDate').value = yearStart.toISOString().split('T')[0];
+    document.getElementById('endDate').value = now.toISOString().split('T')[0];
+    
+    initializeChart();
+    setDateRange('ytd');
 });
+
+function setDateRange(range) {
+    const now = new Date();
+    let startDate, endDate;
+    
+    // Update button states
+    document.querySelectorAll('.range-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-range="${range}"]`).classList.add('active');
+    
+    currentRange = range;
+    
+    switch(range) {
+        case 'ytd':
+            startDate = new Date(now.getFullYear(), 0, 1);
+            endDate = now;
+            document.getElementById('startDate').style.display = 'none';
+            document.getElementById('endDate').style.display = 'none';
+            document.getElementById('updateBtn').style.display = 'none';
+            break;
+        case 'last12':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+            endDate = now;
+            document.getElementById('startDate').style.display = 'none';
+            document.getElementById('endDate').style.display = 'none';
+            document.getElementById('updateBtn').style.display = 'none';
+            break;
+        case 'custom':
+            document.getElementById('startDate').style.display = 'block';
+            document.getElementById('endDate').style.display = 'block';
+            document.getElementById('updateBtn').style.display = 'block';
+            return; // Don't update chart until user clicks update
+    }
+    
+    document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+    
+    updateChart();
+}
 
 function initializeChart() {
     const ctx = document.getElementById('revenueChart').getContext('2d');
@@ -249,8 +307,25 @@ function initializeChart() {
     revenueChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-            datasets: []
+            labels: [],
+            datasets: [
+                {
+                    label: 'Total Revenue',
+                    data: [],
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.1,
+                    fill: true
+                },
+                {
+                    label: 'Operating Expenses',
+                    data: [],
+                    borderColor: 'rgb(239, 68, 68)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    tension: 0.1,
+                    fill: true
+                }
+            ]
         },
         options: {
             responsive: true,
@@ -289,105 +364,27 @@ function initializeChart() {
             }
         }
     });
-    
-    // Load initial data
-    updateChart();
 }
 
 function updateChart() {
-    const year = document.getElementById('yearFilter').value;
-    const viewType = document.getElementById('viewFilter').value;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
     
     // Show loading state
     document.getElementById('revenueChart').style.opacity = '0.5';
     
-    fetch(`{% url 'agency:revenue_chart_data' %}?year=${year}`)
+    // Fetch data for the date range
+    fetch(`{% url 'agency:revenue_chart_data' %}?start_date=${startDate}&end_date=${endDate}`)
         .then(response => response.json())
         .then(data => {
-            // Update chart based on view type
-            let datasets = [];
-            
-            if (viewType === 'combined') {
-                // Show combined revenue (booked + forecast) and expenses
-                datasets = [
-                    {
-                        label: 'Total Revenue',
-                        data: data.combined || data.months.map((_, i) => (data.booked[i] + data.forecast[i])),
-                        borderColor: 'rgb(59, 130, 246)',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.1,
-                        fill: true
-                    },
-                    {
-                        label: 'Operating Expenses',
-                        data: data.expenses,
-                        borderColor: 'rgb(239, 68, 68)',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        tension: 0.1,
-                        fill: true
-                    }
-                ];
-            } else if (viewType === 'stacked') {
-                // Show stacked booked and forecast revenue
-                revenueChart.config.type = 'bar';
-                datasets = [
-                    {
-                        label: 'Booked Revenue',
-                        data: data.booked,
-                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-                        stack: 'revenue'
-                    },
-                    {
-                        label: 'Forecast Revenue',
-                        data: data.forecast,
-                        backgroundColor: 'rgba(251, 191, 36, 0.8)',
-                        stack: 'revenue'
-                    },
-                    {
-                        label: 'Operating Expenses',
-                        data: data.expenses,
-                        backgroundColor: 'rgba(239, 68, 68, 0.8)',
-                        stack: 'expenses'
-                    }
-                ];
-            } else {
-                // Show separate lines for everything
-                revenueChart.config.type = 'line';
-                datasets = [
-                    {
-                        label: 'Booked Revenue',
-                        data: data.booked,
-                        borderColor: 'rgb(59, 130, 246)',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.1
-                    },
-                    {
-                        label: 'Forecast Revenue',
-                        data: data.forecast,
-                        borderColor: 'rgb(251, 191, 36)',
-                        backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                        tension: 0.1
-                    },
-                    {
-                        label: 'Operating Expenses',
-                        data: data.expenses,
-                        borderColor: 'rgb(239, 68, 68)',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        tension: 0.1
-                    }
-                ];
-            }
-            
-            // Update chart data
+            // Update chart with combined revenue view
             revenueChart.data.labels = data.months;
-            revenueChart.data.datasets = datasets;
+            revenueChart.data.datasets[0].data = data.combined || data.months.map((_, i) => (data.booked[i] + data.forecast[i]));
+            revenueChart.data.datasets[1].data = data.expenses;
             revenueChart.update();
             
             // Remove loading state
             document.getElementById('revenueChart').style.opacity = '1';
-            
-            // Log debug info
-            console.log('Chart updated with data:', data);
         })
         .catch(error => {
             console.error('Error loading chart data:', error);
@@ -398,7 +395,7 @@ function updateChart() {
 // User switcher function
 function switchUserView(userId) {
     if (userId) {
-        window.location.href = `{% url 'agency:switch_user_view' %}?user_id=${userId}`;
+        window.location.href = `{% url 'agency:switch_user' %}?user_id=${userId}`;
     }
 }
 </script>
