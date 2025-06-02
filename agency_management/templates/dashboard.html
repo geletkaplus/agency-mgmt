@@ -159,6 +159,13 @@
         border-radius: 4px;
         margin: 1rem 0;
     }
+    .annual-summary {
+        background: #f0f9ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
 </style>
 {% endblock %}
 
@@ -193,6 +200,42 @@
         {% endif %}
     </div>
 
+    <!-- Annual Summary Section (Moved to top) -->
+    <div class="annual-summary" id="annualSummarySection">
+        <h2 class="text-xl font-bold mb-4">Annual Summary (<span id="annualYear">{{ current_year }}</span>)</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="annualMetrics">
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold text-blue-600" id="annualRevenue">${{ total_annual_revenue|floatformat:0 }}</div>
+                <div class="text-sm text-gray-600">Annual Revenue</div>
+                <div class="text-xs text-gray-500">
+                    <span class="text-blue-600" id="annualBookedRevenue">${{ annual_booked_revenue|floatformat:0 }}</span> booked, 
+                    <span class="text-yellow-600" id="annualForecastRevenue">${{ annual_forecast_revenue|floatformat:0 }}</span> forecast
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold text-red-600" id="annualCosts">${{ total_annual_costs|floatformat:0 }}</div>
+                <div class="text-sm text-gray-600">Annual Operating Costs</div>
+                <div class="text-xs text-gray-500">
+                    <span id="annualPayrollCosts">$0</span> payroll,
+                    <span id="annualContractorCosts">$0</span> contractors,
+                    <span id="annualOtherCosts">$0</span> other
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold {% if annual_profit > 0 %}text-green-600{% else %}text-red-600{% endif %}" id="annualProfit">
+                    ${{ annual_profit|floatformat:0 }}
+                </div>
+                <div class="text-sm text-gray-600">Annual Profit</div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold {% if annual_profit > 0 %}text-green-600{% else %}text-red-600{% endif %}" id="annualMargin">
+                    {{ annual_profit_margin|floatformat:1 }}%
+                </div>
+                <div class="text-sm text-gray-600">Annual Profit Margin</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Enhanced Date Range Selector -->
     <div class="period-selector">
         <div class="flex justify-between items-center mb-4">
@@ -209,6 +252,7 @@
                 <button onclick="setDateRange('last_month')" class="range-btn" data-range="last_month">Last Month</button>
                 <button onclick="setDateRange('ytd')" class="range-btn" data-range="ytd">YTD</button>
                 <button onclick="setDateRange('last_12')" class="range-btn" data-range="last_12">Last 12 Months</button>
+                <button onclick="setDateRange('annual')" class="range-btn" data-range="annual">Annual View</button>
                 <button onclick="setDateRange('custom')" class="range-btn" data-range="custom">Custom Range</button>
             </div>
             
@@ -220,12 +264,21 @@
                 <button onclick="updateDashboard()" id="updateBtn" class="bg-blue-500 text-white hover:bg-blue-600">Update</button>
             </div>
             
-            <div class="control-group">
+            <div class="control-group" id="aggregationControl">
                 <label class="text-sm font-medium text-gray-700">View:</label>
                 <select id="aggregationLevel" onchange="updateDashboard()">
                     <option value="monthly">Monthly</option>
                     <option value="quarterly">Quarterly</option>
                     <option value="annual">Annual</option>
+                </select>
+            </div>
+            
+            <div class="control-group" id="yearSelector" style="display:none;">
+                <label class="text-sm font-medium text-gray-700">Year:</label>
+                <select id="yearSelect" onchange="updateDashboard()">
+                    <option value="2023">2023</option>
+                    <option value="2024">2024</option>
+                    <option value="2025" selected>2025</option>
                 </select>
             </div>
         </div>
@@ -254,6 +307,7 @@
             <div class="metric-value negative" id="dynamicCosts">${{ current_month_costs|floatformat:0|default:"0" }}</div>
             <div class="text-sm text-gray-600">
                 <div class="metric-sublabel">Payroll: $<span id="payrollAmount">{{ payroll_costs|floatformat:0 }}</span></div>
+                <div class="metric-sublabel">Contractors: $<span id="contractorAmount">{{ contractor_costs|floatformat:0 }}</span></div>
                 <div class="metric-sublabel">Other: $<span id="otherCostsAmount">{{ other_costs|floatformat:0 }}</span></div>
             </div>
         </div>
@@ -274,37 +328,6 @@
             <div class="text-sm text-gray-600">
                 <div class="metric-sublabel">Utilization: <span id="utilizationRate">0%</span></div>
                 <div class="metric-sublabel">Allocated: <span id="allocatedHours">0</span> hrs</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Annual Summary Section -->
-    <div class="section-divider">
-        <h2 class="text-xl font-bold mb-6">Annual Summary ({{ current_year }})</h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8" id="annualMetrics">
-            <div class="bg-white p-4 rounded-lg shadow">
-                <div class="text-2xl font-bold text-blue-600" id="annualRevenue">${{ total_annual_revenue|floatformat:0 }}</div>
-                <div class="text-sm text-gray-600">Annual Revenue</div>
-                <div class="text-xs text-gray-500">
-                    <span class="text-blue-600">${{ annual_booked_revenue|floatformat:0 }}</span> booked, 
-                    <span class="text-yellow-600">${{ annual_forecast_revenue|floatformat:0 }}</span> forecast
-                </div>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow">
-                <div class="text-2xl font-bold text-red-600" id="annualCosts">${{ total_annual_costs|floatformat:0 }}</div>
-                <div class="text-sm text-gray-600">Annual Operating Costs</div>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow">
-                <div class="text-2xl font-bold {% if annual_profit > 0 %}text-green-600{% else %}text-red-600{% endif %}" id="annualProfit">
-                    ${{ annual_profit|floatformat:0 }}
-                </div>
-                <div class="text-sm text-gray-600">Annual Profit</div>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow">
-                <div class="text-2xl font-bold {% if annual_profit > 0 %}text-green-600{% else %}text-red-600{% endif %}" id="annualMargin">
-                    {{ annual_profit_margin|floatformat:1 }}%
-                </div>
-                <div class="text-sm text-gray-600">Annual Profit Margin</div>
             </div>
         </div>
     </div>
@@ -446,30 +469,53 @@ function setDateRange(range) {
     
     currentRange = range;
     
+    // Hide/show year selector based on range
+    const yearSelector = document.getElementById('yearSelector');
+    const aggregationControl = document.getElementById('aggregationControl');
+    
     switch(range) {
         case 'current_month':
             startDate = new Date(now.getFullYear(), now.getMonth(), 1);
             endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
             label = `${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+            yearSelector.style.display = 'none';
+            aggregationControl.style.display = 'block';
             break;
         case 'last_month':
             startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
             endDate = new Date(now.getFullYear(), now.getMonth(), 0);
             label = `${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+            yearSelector.style.display = 'none';
+            aggregationControl.style.display = 'block';
             break;
         case 'ytd':
             startDate = new Date(now.getFullYear(), 0, 1);
             endDate = now;
             label = `Year to Date ${now.getFullYear()}`;
+            yearSelector.style.display = 'none';
+            aggregationControl.style.display = 'block';
             break;
         case 'last_12':
             startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
             endDate = now;
             label = 'Last 12 Months';
+            yearSelector.style.display = 'none';
+            aggregationControl.style.display = 'block';
+            break;
+        case 'annual':
+            const selectedYear = parseInt(document.getElementById('yearSelect').value);
+            startDate = new Date(selectedYear, 0, 1);
+            endDate = new Date(selectedYear, 11, 31);
+            label = `Annual ${selectedYear}`;
+            yearSelector.style.display = 'block';
+            aggregationControl.style.display = 'none';
+            document.getElementById('aggregationLevel').value = 'monthly';
             break;
         case 'custom':
             document.getElementById('customDateInputs').style.display = 'flex';
             document.getElementById('currentSelection').textContent = 'Custom Range';
+            yearSelector.style.display = 'none';
+            aggregationControl.style.display = 'block';
             return; // Don't update dashboard until user sets dates
     }
     
@@ -508,6 +554,12 @@ function updateDashboard() {
         log('Custom date range set:', { start: formatDate(currentStartDate), end: formatDate(currentEndDate) });
     }
     
+    if (currentRange === 'annual') {
+        const selectedYear = parseInt(document.getElementById('yearSelect').value);
+        currentStartDate = new Date(selectedYear, 0, 1);
+        currentEndDate = new Date(selectedYear, 11, 31);
+    }
+    
     // Show loading state
     document.getElementById('dynamicMetrics').classList.add('loading');
     document.getElementById('revenueChart').style.opacity = '0.5';
@@ -515,7 +567,8 @@ function updateDashboard() {
     // Update metrics and chart
     Promise.all([
         fetchDashboardData(),
-        fetchChartData()
+        fetchChartData(),
+        fetchAnnualData()
     ]).then(() => {
         log('Dashboard update completed');
         document.getElementById('dynamicMetrics').classList.remove('loading');
@@ -552,15 +605,30 @@ function fetchDashboardData() {
         })
         .catch(error => {
             console.error('Dashboard data fetch error:', error);
-            showError(`Failed to fetch dashboard data: ${error.message}`);
+            // Fallback to template data if API fails
+            const fallbackData = {
+                revenue: parseFloat('{{ current_revenue|default:0 }}'),
+                booked_revenue: parseFloat('{{ current_revenue|default:0 }}'),
+                forecast_revenue: 0,
+                costs: parseFloat('{{ current_month_costs|default:0 }}'),
+                payroll_costs: parseFloat('{{ payroll_costs|default:0 }}'),
+                contractor_costs: parseFloat('{{ contractor_costs|default:0 }}'),
+                other_costs: parseFloat('{{ other_costs|default:0 }}'),
+                profit: parseFloat('{{ monthly_profit|default:0 }}'),
+                profit_margin: parseFloat('{{ monthly_profit_margin|default:0 }}'),
+                capacity: 0,
+                utilization_rate: 0,
+                allocated_hours: 0,
+                avg_project_value: parseFloat('{{ total_annual_revenue|default:0 }}') / Math.max(1, parseInt('{{ total_projects|default:1 }}'))
+            };
+            updateMetrics(fallbackData);
         });
 }
 
 function fetchChartData() {
+    const year = currentStartDate.getFullYear();
     const params = new URLSearchParams({
-        start_date: formatDate(currentStartDate),
-        end_date: formatDate(currentEndDate),
-        year: currentStartDate.getFullYear()
+        year: year
     });
     
     const url = '/agency/api/revenue-chart/?' + params.toString();
@@ -584,6 +652,32 @@ function fetchChartData() {
         });
 }
 
+function fetchAnnualData() {
+    // Update annual summary
+    const year = currentRange === 'annual' ? 
+        parseInt(document.getElementById('yearSelect').value) : 
+        currentStartDate.getFullYear();
+    
+    document.getElementById('annualYear').textContent = year;
+    
+    // For now, use existing annual data from template
+    // In production, this would fetch from an API endpoint
+    const annualData = {
+        revenue: parseFloat('{{ total_annual_revenue|default:0 }}'),
+        booked_revenue: parseFloat('{{ annual_booked_revenue|default:0 }}'),
+        forecast_revenue: parseFloat('{{ annual_forecast_revenue|default:0 }}'),
+        costs: parseFloat('{{ total_annual_costs|default:0 }}'),
+        payroll_costs: parseFloat('{{ payroll_costs|default:0 }}') * 12,
+        contractor_costs: parseFloat('{{ contractor_costs|default:0 }}') * 12,
+        other_costs: parseFloat('{{ other_costs|default:0 }}') * 12,
+        profit: parseFloat('{{ annual_profit|default:0 }}'),
+        profit_margin: parseFloat('{{ annual_profit_margin|default:0 }}')
+    };
+    
+    updateAnnualMetrics(annualData);
+    return Promise.resolve();
+}
+
 function updateMetrics(data) {
     log('Updating metrics with data:', data);
     
@@ -601,6 +695,7 @@ function updateMetrics(data) {
     document.getElementById('bookedAmount').textContent = `$${(data.booked_revenue || 0).toLocaleString()} booked`;
     document.getElementById('forecastAmount').textContent = `$${(data.forecast_revenue || 0).toLocaleString()} forecast`;
     document.getElementById('payrollAmount').textContent = (data.payroll_costs || 0).toLocaleString();
+    document.getElementById('contractorAmount').textContent = (data.contractor_costs || 0).toLocaleString();
     document.getElementById('otherCostsAmount').textContent = (data.other_costs || 0).toLocaleString();
     document.getElementById('profitMargin').textContent = `${(data.profit_margin || 0).toFixed(1)}%`;
     document.getElementById('utilizationRate').textContent = `${(data.utilization_rate || 0).toFixed(1)}%`;
@@ -611,10 +706,34 @@ function updateMetrics(data) {
     
     // Update metric labels based on time range
     const isMonthly = currentRange === 'current_month' || currentRange === 'last_month';
-    document.querySelector('#monthlyRevenueCard .metric-label').textContent = isMonthly ? 'Monthly Revenue' : 'Period Revenue';
-    document.querySelector('#monthlyCostsCard .metric-label').textContent = isMonthly ? 'Monthly Costs' : 'Period Costs';
-    document.querySelector('#monthlyProfitCard .metric-label').textContent = isMonthly ? 'Monthly Profit' : 'Period Profit';
-    document.querySelector('#monthlyCapacityCard .metric-label').textContent = isMonthly ? 'Monthly Capacity' : 'Period Capacity';
+    const isAnnual = currentRange === 'annual';
+    
+    document.querySelector('#monthlyRevenueCard .metric-label').textContent = 
+        isAnnual ? 'Annual Revenue' : (isMonthly ? 'Monthly Revenue' : 'Period Revenue');
+    document.querySelector('#monthlyCostsCard .metric-label').textContent = 
+        isAnnual ? 'Annual Costs' : (isMonthly ? 'Monthly Costs' : 'Period Costs');
+    document.querySelector('#monthlyProfitCard .metric-label').textContent = 
+        isAnnual ? 'Annual Profit' : (isMonthly ? 'Monthly Profit' : 'Period Profit');
+    document.querySelector('#monthlyCapacityCard .metric-label').textContent = 
+        isAnnual ? 'Annual Capacity' : (isMonthly ? 'Monthly Capacity' : 'Period Capacity');
+}
+
+function updateAnnualMetrics(data) {
+    document.getElementById('annualRevenue').textContent = `$${(data.revenue || 0).toLocaleString()}`;
+    document.getElementById('annualBookedRevenue').textContent = `$${(data.booked_revenue || 0).toLocaleString()}`;
+    document.getElementById('annualForecastRevenue').textContent = `$${(data.forecast_revenue || 0).toLocaleString()}`;
+    document.getElementById('annualCosts').textContent = `$${(data.costs || 0).toLocaleString()}`;
+    document.getElementById('annualPayrollCosts').textContent = `$${(data.payroll_costs || 0).toLocaleString()}`;
+    document.getElementById('annualContractorCosts').textContent = `$${(data.contractor_costs || 0).toLocaleString()}`;
+    document.getElementById('annualOtherCosts').textContent = `$${(data.other_costs || 0).toLocaleString()}`;
+    
+    const profitElement = document.getElementById('annualProfit');
+    profitElement.textContent = `$${(data.profit || 0).toLocaleString()}`;
+    profitElement.className = `text-2xl font-bold ${data.profit >= 0 ? 'text-green-600' : 'text-red-600'}`;
+    
+    const marginElement = document.getElementById('annualMargin');
+    marginElement.textContent = `${(data.profit_margin || 0).toFixed(1)}%`;
+    marginElement.className = `text-2xl font-bold ${data.profit >= 0 ? 'text-green-600' : 'text-red-600'}`;
 }
 
 function initializeChart() {
@@ -714,14 +833,45 @@ function updateChart(data) {
         return;
     }
     
-    revenueChart.data.labels = data.months || [];
-    revenueChart.data.datasets[0].data = data.combined || [];
-    revenueChart.data.datasets[1].data = data.booked || [];
-    revenueChart.data.datasets[2].data = data.forecast || [];
-    revenueChart.data.datasets[3].data = data.expenses || [];
+    // Filter data based on current date range if needed
+    let filteredData = filterChartData(data);
+    
+    revenueChart.data.labels = filteredData.months || [];
+    revenueChart.data.datasets[0].data = filteredData.combined || [];
+    revenueChart.data.datasets[1].data = filteredData.booked || [];
+    revenueChart.data.datasets[2].data = filteredData.forecast || [];
+    revenueChart.data.datasets[3].data = filteredData.expenses || [];
     revenueChart.update();
     
     log('Chart updated successfully');
+}
+
+function filterChartData(data) {
+    // If showing full year or annual view, return all data
+    if (currentRange === 'annual' || currentRange === 'ytd' || currentRange === 'last_12') {
+        return data;
+    }
+    
+    // For monthly views, filter to show only relevant months
+    const startMonth = currentStartDate.getMonth();
+    const endMonth = currentEndDate.getMonth();
+    const startYear = currentStartDate.getFullYear();
+    const endYear = currentEndDate.getFullYear();
+    
+    if (startYear === endYear && (currentRange === 'current_month' || currentRange === 'last_month')) {
+        // Single month view
+        const monthIndex = startMonth;
+        return {
+            months: [data.months[monthIndex]],
+            combined: [data.combined[monthIndex]],
+            booked: [data.booked[monthIndex]],
+            forecast: [data.forecast[monthIndex]],
+            expenses: [data.expenses[monthIndex]]
+        };
+    }
+    
+    // For custom ranges or other views, return all data
+    return data;
 }
 
 // User switcher function
