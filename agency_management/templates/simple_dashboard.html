@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="header">
+        <h1>Admin Dashboard</h1>
+        <p>Logged in as: {{ user.username }}</p>
+    </div>
+
+    {% if viewing_as_user %}
+    <div class="viewing-as">
+        ⚠️ Currently viewing as: <strong>{{ viewing_as_user.username }}</strong>
+        <a href="/agency/switch-back/" class="button">Back to Admin</a>
+    </div>
+    {% endif %}
+
+    <div class="switcher">
+        <h3>Switch User View:</h3>
+        <select id="userSelect" onchange="switchUser(this.value)">
+            <option value="">-- Select User --</option>
+            {% for profile in all_profiles %}
+            <option value="{{ profile.user.id }}">
+                {{ profile.user.username }} - {{ profile.get_role_display }}
+                {% if profile.is_project_manager %}(PM){% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="metrics">
+        <div class="metric">
+            <div class="metric-value">${{ current_revenue|floatformat:0 }}</div>
+            <div class="metric-label">Monthly Revenue</div>
+        </div>
+        <div class="metric">
+            <div class="metric-value">${{ total_annual_revenue|floatformat:0 }}</div>
+            <div class="metric-label">Annual Revenue</div>
+        </div>
+        <div class="metric">
+            <div class="metric-value">${{ monthly_profit|floatformat:0 }}</div>
+            <div class="metric-label">Monthly Profit</div>
+        </div>
+    </div>
+
+    <script>
+    function switchUser(userId) {
+        if (userId) {
+            console.log('Switching to user:', userId);
+            window.location.href = '/agency/switch-user/?user_id=' + userId;
+        }
+    }
+    </script>
+{% endblock %}

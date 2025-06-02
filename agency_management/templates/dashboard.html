@@ -11,6 +11,7 @@
         padding: 1.5rem;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         transition: transform 0.2s;
+        position: relative;
     }
     .metric-card:hover {
         transform: translateY(-2px);
@@ -27,6 +28,11 @@
         text-transform: uppercase;
         letter-spacing: 0.05em;
     }
+    .metric-sublabel {
+        color: #888;
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
     .positive {
         color: #10b981;
     }
@@ -39,19 +45,26 @@
         padding: 1.5rem;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         margin-top: 2rem;
-        height: 400px;
+        height: 450px;
     }
     .date-range-controls {
         display: flex;
         gap: 1rem;
         align-items: center;
-        margin-bottom: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
     }
-    .date-range-controls input[type="date"] {
+    .date-range-controls .control-group {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .date-range-controls input[type="date"], .date-range-controls select {
         padding: 0.5rem 1rem;
         border: 1px solid #ddd;
         border-radius: 4px;
         background: white;
+        font-size: 14px;
     }
     .date-range-controls button {
         padding: 0.5rem 1rem;
@@ -60,6 +73,7 @@
         background: white;
         cursor: pointer;
         transition: all 0.2s;
+        font-size: 14px;
     }
     .date-range-controls button:hover {
         background: #f3f4f6;
@@ -106,6 +120,45 @@
         background: #fef3c7;
         color: #92400e;
     }
+    .loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+    .loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 20px;
+        height: 20px;
+        margin: -10px 0 0 -10px;
+        border: 2px solid #3b82f6;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    .period-selector {
+        background: #f8fafc;
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 2rem;
+    }
+    .section-divider {
+        border-top: 2px solid #e2e8f0;
+        margin: 2rem 0;
+        padding-top: 2rem;
+    }
+    .error-message {
+        background: #fee2e2;
+        color: #dc2626;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+    }
 </style>
 {% endblock %}
 
@@ -140,49 +193,123 @@
         {% endif %}
     </div>
 
-    <!-- Key Metrics Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <!-- Revenue Card -->
-        <div class="metric-card">
-            <div class="metric-label">Monthly Revenue</div>
-            <div class="metric-value">${{ current_revenue|floatformat:0|default:"0" }}</div>
+    <!-- Enhanced Date Range Selector -->
+    <div class="period-selector">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Select Time Period</h2>
             <div class="text-sm text-gray-600">
-                <span class="revenue-type-badge badge-booked">Booked</span>
+                <span id="currentSelection">Current Month</span>
             </div>
         </div>
-
-        <!-- Annual Revenue Card -->
-        <div class="metric-card">
-            <div class="metric-label">Annual Revenue</div>
-            <div class="metric-value">${{ total_annual_revenue|floatformat:0|default:"0" }}</div>
-            <div class="text-sm text-gray-600">
-                <span class="text-blue-600">${{ annual_booked_revenue|floatformat:0 }}</span> booked
-                <span class="text-yellow-600 ml-2">${{ annual_forecast_revenue|floatformat:0 }}</span> forecast
+        
+        <div class="date-range-controls">
+            <div class="control-group">
+                <label class="text-sm font-medium text-gray-700">Quick Select:</label>
+                <button onclick="setDateRange('current_month')" class="range-btn active" data-range="current_month">Current Month</button>
+                <button onclick="setDateRange('last_month')" class="range-btn" data-range="last_month">Last Month</button>
+                <button onclick="setDateRange('ytd')" class="range-btn" data-range="ytd">YTD</button>
+                <button onclick="setDateRange('last_12')" class="range-btn" data-range="last_12">Last 12 Months</button>
+                <button onclick="setDateRange('custom')" class="range-btn" data-range="custom">Custom Range</button>
             </div>
-        </div>
-
-        <!-- Costs Card -->
-        <div class="metric-card">
-            <div class="metric-label">Monthly Operating Costs</div>
-            <div class="metric-value negative">${{ current_month_costs|floatformat:0|default:"0" }}</div>
-            <div class="text-sm text-gray-600">
-                Payroll: ${{ payroll_costs|floatformat:0 }}
+            
+            <div class="control-group" id="customDateInputs" style="display:none;">
+                <label class="text-sm font-medium text-gray-700">From:</label>
+                <input type="date" id="startDate">
+                <label class="text-sm font-medium text-gray-700">To:</label>
+                <input type="date" id="endDate">
+                <button onclick="updateDashboard()" id="updateBtn" class="bg-blue-500 text-white hover:bg-blue-600">Update</button>
             </div>
-        </div>
-
-        <!-- Profit Card -->
-        <div class="metric-card">
-            <div class="metric-label">Monthly Profit</div>
-            <div class="metric-value {% if monthly_profit > 0 %}positive{% else %}negative{% endif %}">
-                ${{ monthly_profit|floatformat:0|default:"0" }}
-            </div>
-            <div class="text-sm text-gray-600">
-                Margin: {{ monthly_profit_margin|floatformat:1 }}%
+            
+            <div class="control-group">
+                <label class="text-sm font-medium text-gray-700">View:</label>
+                <select id="aggregationLevel" onchange="updateDashboard()">
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="annual">Annual</option>
+                </select>
             </div>
         </div>
     </div>
 
-    <!-- Secondary Metrics -->
+    <!-- Error Display -->
+    <div id="errorDisplay" class="error-message" style="display:none;">
+        <strong>Error:</strong> <span id="errorMessage"></span>
+    </div>
+
+    <!-- Dynamic Key Metrics Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" id="dynamicMetrics">
+        <!-- Monthly Revenue -->
+        <div class="metric-card" id="monthlyRevenueCard">
+            <div class="metric-label">Revenue</div>
+            <div class="metric-value" id="dynamicRevenue">${{ current_revenue|floatformat:0|default:"0" }}</div>
+            <div class="text-sm text-gray-600">
+                <span class="revenue-type-badge badge-booked" id="bookedAmount">${{ current_revenue|floatformat:0 }} booked</span>
+                <div class="metric-sublabel" id="forecastAmount">$0 forecast</div>
+            </div>
+        </div>
+
+        <!-- Monthly Costs -->
+        <div class="metric-card" id="monthlyCostsCard">
+            <div class="metric-label">Operating Costs</div>
+            <div class="metric-value negative" id="dynamicCosts">${{ current_month_costs|floatformat:0|default:"0" }}</div>
+            <div class="text-sm text-gray-600">
+                <div class="metric-sublabel">Payroll: $<span id="payrollAmount">{{ payroll_costs|floatformat:0 }}</span></div>
+                <div class="metric-sublabel">Other: $<span id="otherCostsAmount">{{ other_costs|floatformat:0 }}</span></div>
+            </div>
+        </div>
+
+        <!-- Monthly Profit -->
+        <div class="metric-card" id="monthlyProfitCard">
+            <div class="metric-label">Profit</div>
+            <div class="metric-value" id="dynamicProfit">${{ monthly_profit|floatformat:0|default:"0" }}</div>
+            <div class="text-sm text-gray-600">
+                <div class="metric-sublabel">Margin: <span id="profitMargin">{{ monthly_profit_margin|floatformat:1 }}%</span></div>
+            </div>
+        </div>
+
+        <!-- Monthly Capacity -->
+        <div class="metric-card" id="monthlyCapacityCard">
+            <div class="metric-label">Team Capacity</div>
+            <div class="metric-value" id="dynamicCapacity">0 hrs</div>
+            <div class="text-sm text-gray-600">
+                <div class="metric-sublabel">Utilization: <span id="utilizationRate">0%</span></div>
+                <div class="metric-sublabel">Allocated: <span id="allocatedHours">0</span> hrs</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Annual Summary Section -->
+    <div class="section-divider">
+        <h2 class="text-xl font-bold mb-6">Annual Summary ({{ current_year }})</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8" id="annualMetrics">
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold text-blue-600" id="annualRevenue">${{ total_annual_revenue|floatformat:0 }}</div>
+                <div class="text-sm text-gray-600">Annual Revenue</div>
+                <div class="text-xs text-gray-500">
+                    <span class="text-blue-600">${{ annual_booked_revenue|floatformat:0 }}</span> booked, 
+                    <span class="text-yellow-600">${{ annual_forecast_revenue|floatformat:0 }}</span> forecast
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold text-red-600" id="annualCosts">${{ total_annual_costs|floatformat:0 }}</div>
+                <div class="text-sm text-gray-600">Annual Operating Costs</div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold {% if annual_profit > 0 %}text-green-600{% else %}text-red-600{% endif %}" id="annualProfit">
+                    ${{ annual_profit|floatformat:0 }}
+                </div>
+                <div class="text-sm text-gray-600">Annual Profit</div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold {% if annual_profit > 0 %}text-green-600{% else %}text-red-600{% endif %}" id="annualMargin">
+                    {{ annual_profit_margin|floatformat:1 }}%
+                </div>
+                <div class="text-sm text-gray-600">Annual Profit Margin</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Business Overview -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div class="bg-white p-4 rounded-lg shadow">
             <div class="text-2xl font-bold">{{ total_clients }}</div>
@@ -200,27 +327,35 @@
             <div class="text-sm text-gray-600">Team Members</div>
         </div>
         <div class="bg-white p-4 rounded-lg shadow">
-            <div class="text-2xl font-bold {% if annual_profit > 0 %}text-green-600{% else %}text-red-600{% endif %}">
-                {{ annual_profit_margin|floatformat:1 }}%
-            </div>
-            <div class="text-sm text-gray-600">Annual Profit Margin</div>
+            <div class="text-2xl font-bold">$<span id="avgProjectValue">0</span></div>
+            <div class="text-sm text-gray-600">Avg Project Value</div>
         </div>
     </div>
 
-    <!-- Revenue Chart -->
+    <!-- Enhanced Revenue Chart -->
     <div class="chart-container">
-        <div class="date-range-controls">
+        <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-bold">Revenue & Operating Expenses</h2>
-            <div class="ml-auto flex gap-2">
-                <button onclick="setDateRange('ytd')" class="range-btn" data-range="ytd">YTD</button>
-                <button onclick="setDateRange('last12')" class="range-btn" data-range="last12">Last 12 Months</button>
-                <button onclick="setDateRange('custom')" class="range-btn" data-range="custom">Custom</button>
-                <input type="date" id="startDate" style="display:none;">
-                <input type="date" id="endDate" style="display:none;">
-                <button onclick="updateChart()" id="updateBtn" style="display:none; background:#3b82f6; color:white;">Update</button>
+            <div class="flex items-center gap-4 text-sm">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-blue-500 rounded"></div>
+                    <span>Total Revenue</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-green-500 rounded"></div>
+                    <span>Booked Revenue</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-yellow-500 rounded"></div>
+                    <span>Forecast Revenue</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-red-500 rounded"></div>
+                    <span>Operating Expenses</span>
+                </div>
             </div>
         </div>
-        <canvas id="revenueChart" style="max-height: 300px;"></canvas>
+        <canvas id="revenueChart" style="max-height: 350px;"></canvas>
     </div>
 
     <!-- Quick Actions -->
@@ -242,28 +377,66 @@
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
 <script>
-// Global chart variable
+// Global variables
 let revenueChart = null;
-let currentRange = 'ytd';
+let currentRange = 'current_month';
+let currentStartDate = null;
+let currentEndDate = null;
 
-// Initialize chart when page loads
+// Debug mode
+const DEBUG = true;
+
+function log(message, data = null) {
+    if (DEBUG) {
+        console.log('[Dashboard]', message, data || '');
+    }
+}
+
+// Initialize dashboard when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Set initial date range to YTD
-    const now = new Date();
-    const yearStart = new Date(now.getFullYear(), 0, 1);
-    
-    document.getElementById('startDate').value = yearStart.toISOString().split('T')[0];
-    document.getElementById('endDate').value = now.toISOString().split('T')[0];
-    
-    initializeChart();
-    setDateRange('ytd');
+    log('Initializing dashboard...');
+    initializeDashboard();
 });
 
-function setDateRange(range) {
+function initializeDashboard() {
+    // Set default to current month
     const now = new Date();
-    let startDate, endDate;
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    currentStartDate = monthStart;
+    currentEndDate = monthEnd;
+    
+    document.getElementById('startDate').value = formatDate(monthStart);
+    document.getElementById('endDate').value = formatDate(monthEnd);
+    
+    log('Date range set to:', { start: formatDate(monthStart), end: formatDate(monthEnd) });
+    
+    initializeChart();
+    updateDashboard();
+}
+
+function formatDate(date) {
+    return date.toISOString().split('T')[0];
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorDisplay');
+    const errorMsg = document.getElementById('errorMessage');
+    errorMsg.textContent = message;
+    errorDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
+}
+
+function setDateRange(range) {
+    log('Setting date range:', range);
+    
+    const now = new Date();
+    let startDate, endDate, label;
     
     // Update button states
     document.querySelectorAll('.range-btn').forEach(btn => {
@@ -274,34 +447,179 @@ function setDateRange(range) {
     currentRange = range;
     
     switch(range) {
+        case 'current_month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            label = `${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+            break;
+        case 'last_month':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+            label = `${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+            break;
         case 'ytd':
             startDate = new Date(now.getFullYear(), 0, 1);
             endDate = now;
-            document.getElementById('startDate').style.display = 'none';
-            document.getElementById('endDate').style.display = 'none';
-            document.getElementById('updateBtn').style.display = 'none';
+            label = `Year to Date ${now.getFullYear()}`;
             break;
-        case 'last12':
+        case 'last_12':
             startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
             endDate = now;
-            document.getElementById('startDate').style.display = 'none';
-            document.getElementById('endDate').style.display = 'none';
-            document.getElementById('updateBtn').style.display = 'none';
+            label = 'Last 12 Months';
             break;
         case 'custom':
-            document.getElementById('startDate').style.display = 'block';
-            document.getElementById('endDate').style.display = 'block';
-            document.getElementById('updateBtn').style.display = 'block';
-            return; // Don't update chart until user clicks update
+            document.getElementById('customDateInputs').style.display = 'flex';
+            document.getElementById('currentSelection').textContent = 'Custom Range';
+            return; // Don't update dashboard until user sets dates
     }
     
-    document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
-    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+    if (range !== 'custom') {
+        document.getElementById('customDateInputs').style.display = 'none';
+        currentStartDate = startDate;
+        currentEndDate = endDate;
+        
+        document.getElementById('startDate').value = formatDate(startDate);
+        document.getElementById('endDate').value = formatDate(endDate);
+        document.getElementById('currentSelection').textContent = label;
+        
+        log('Updated date range:', { start: formatDate(startDate), end: formatDate(endDate), label });
+        updateDashboard();
+    }
+}
+
+function updateDashboard() {
+    log('Updating dashboard...');
     
-    updateChart();
+    if (currentRange === 'custom') {
+        const startInput = document.getElementById('startDate').value;
+        const endInput = document.getElementById('endDate').value;
+        
+        if (!startInput || !endInput) {
+            showError('Please select both start and end dates');
+            return;
+        }
+        
+        currentStartDate = new Date(startInput);
+        currentEndDate = new Date(endInput);
+        
+        const label = `${currentStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${currentEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        document.getElementById('currentSelection').textContent = label;
+        
+        log('Custom date range set:', { start: formatDate(currentStartDate), end: formatDate(currentEndDate) });
+    }
+    
+    // Show loading state
+    document.getElementById('dynamicMetrics').classList.add('loading');
+    document.getElementById('revenueChart').style.opacity = '0.5';
+    
+    // Update metrics and chart
+    Promise.all([
+        fetchDashboardData(),
+        fetchChartData()
+    ]).then(() => {
+        log('Dashboard update completed');
+        document.getElementById('dynamicMetrics').classList.remove('loading');
+        document.getElementById('revenueChart').style.opacity = '1';
+    }).catch(error => {
+        console.error('Error updating dashboard:', error);
+        showError('Failed to update dashboard data');
+        document.getElementById('dynamicMetrics').classList.remove('loading');
+        document.getElementById('revenueChart').style.opacity = '1';
+    });
+}
+
+function fetchDashboardData() {
+    const params = new URLSearchParams({
+        start_date: formatDate(currentStartDate),
+        end_date: formatDate(currentEndDate),
+        aggregation: document.getElementById('aggregationLevel').value
+    });
+    
+    const url = '/agency/api/dashboard-data/?' + params.toString();
+    log('Fetching dashboard data from:', url);
+    
+    return fetch(url)
+        .then(response => {
+            log('Dashboard data response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            log('Dashboard data received:', data);
+            updateMetrics(data);
+        })
+        .catch(error => {
+            console.error('Dashboard data fetch error:', error);
+            showError(`Failed to fetch dashboard data: ${error.message}`);
+        });
+}
+
+function fetchChartData() {
+    const params = new URLSearchParams({
+        start_date: formatDate(currentStartDate),
+        end_date: formatDate(currentEndDate),
+        year: currentStartDate.getFullYear()
+    });
+    
+    const url = '/agency/api/revenue-chart/?' + params.toString();
+    log('Fetching chart data from:', url);
+    
+    return fetch(url)
+        .then(response => {
+            log('Chart data response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            log('Chart data received:', data);
+            updateChart(data);
+        })
+        .catch(error => {
+            console.error('Chart data fetch error:', error);
+            showError(`Failed to fetch chart data: ${error.message}`);
+        });
+}
+
+function updateMetrics(data) {
+    log('Updating metrics with data:', data);
+    
+    // Update dynamic metrics
+    document.getElementById('dynamicRevenue').textContent = `$${(data.revenue || 0).toLocaleString()}`;
+    document.getElementById('dynamicCosts').textContent = `$${(data.costs || 0).toLocaleString()}`;
+    document.getElementById('dynamicProfit').textContent = `$${(data.profit || 0).toLocaleString()}`;
+    document.getElementById('dynamicCapacity').textContent = `${(data.capacity || 0).toLocaleString()} hrs`;
+    
+    // Update profit color
+    const profitElement = document.getElementById('dynamicProfit');
+    profitElement.className = `metric-value ${data.profit >= 0 ? 'positive' : 'negative'}`;
+    
+    // Update sub-metrics
+    document.getElementById('bookedAmount').textContent = `$${(data.booked_revenue || 0).toLocaleString()} booked`;
+    document.getElementById('forecastAmount').textContent = `$${(data.forecast_revenue || 0).toLocaleString()} forecast`;
+    document.getElementById('payrollAmount').textContent = (data.payroll_costs || 0).toLocaleString();
+    document.getElementById('otherCostsAmount').textContent = (data.other_costs || 0).toLocaleString();
+    document.getElementById('profitMargin').textContent = `${(data.profit_margin || 0).toFixed(1)}%`;
+    document.getElementById('utilizationRate').textContent = `${(data.utilization_rate || 0).toFixed(1)}%`;
+    document.getElementById('allocatedHours').textContent = (data.allocated_hours || 0).toLocaleString();
+    
+    // Update average project value
+    document.getElementById('avgProjectValue').textContent = (data.avg_project_value || 0).toLocaleString();
+    
+    // Update metric labels based on time range
+    const isMonthly = currentRange === 'current_month' || currentRange === 'last_month';
+    document.querySelector('#monthlyRevenueCard .metric-label').textContent = isMonthly ? 'Monthly Revenue' : 'Period Revenue';
+    document.querySelector('#monthlyCostsCard .metric-label').textContent = isMonthly ? 'Monthly Costs' : 'Period Costs';
+    document.querySelector('#monthlyProfitCard .metric-label').textContent = isMonthly ? 'Monthly Profit' : 'Period Profit';
+    document.querySelector('#monthlyCapacityCard .metric-label').textContent = isMonthly ? 'Monthly Capacity' : 'Period Capacity';
 }
 
 function initializeChart() {
+    log('Initializing chart...');
+    
     const ctx = document.getElementById('revenueChart').getContext('2d');
     
     revenueChart = new Chart(ctx, {
@@ -315,7 +633,26 @@ function initializeChart() {
                     borderColor: 'rgb(59, 130, 246)',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
                     tension: 0.1,
-                    fill: true
+                    fill: false,
+                    order: 1
+                },
+                {
+                    label: 'Booked Revenue',
+                    data: [],
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    tension: 0.1,
+                    fill: false,
+                    order: 2
+                },
+                {
+                    label: 'Forecast Revenue',
+                    data: [],
+                    borderColor: 'rgb(234, 179, 8)',
+                    backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                    tension: 0.1,
+                    fill: false,
+                    order: 3
                 },
                 {
                     label: 'Operating Expenses',
@@ -323,7 +660,8 @@ function initializeChart() {
                     borderColor: 'rgb(239, 68, 68)',
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
                     tension: 0.1,
-                    fill: true
+                    fill: false,
+                    order: 4
                 }
             ]
         },
@@ -364,38 +702,32 @@ function initializeChart() {
             }
         }
     });
+    
+    log('Chart initialized successfully');
 }
 
-function updateChart() {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
+function updateChart(data) {
+    log('Updating chart with data:', data);
     
-    // Show loading state
-    document.getElementById('revenueChart').style.opacity = '0.5';
+    if (!revenueChart) {
+        log('Chart not initialized, skipping update');
+        return;
+    }
     
-    // Fetch data for the date range
-    fetch(`{% url 'agency:revenue_chart_data' %}?start_date=${startDate}&end_date=${endDate}`)
-        .then(response => response.json())
-        .then(data => {
-            // Update chart with combined revenue view
-            revenueChart.data.labels = data.months;
-            revenueChart.data.datasets[0].data = data.combined || data.months.map((_, i) => (data.booked[i] + data.forecast[i]));
-            revenueChart.data.datasets[1].data = data.expenses;
-            revenueChart.update();
-            
-            // Remove loading state
-            document.getElementById('revenueChart').style.opacity = '1';
-        })
-        .catch(error => {
-            console.error('Error loading chart data:', error);
-            document.getElementById('revenueChart').style.opacity = '1';
-        });
+    revenueChart.data.labels = data.months || [];
+    revenueChart.data.datasets[0].data = data.combined || [];
+    revenueChart.data.datasets[1].data = data.booked || [];
+    revenueChart.data.datasets[2].data = data.forecast || [];
+    revenueChart.data.datasets[3].data = data.expenses || [];
+    revenueChart.update();
+    
+    log('Chart updated successfully');
 }
 
 // User switcher function
 function switchUserView(userId) {
     if (userId) {
-        window.location.href = `{% url 'agency:switch_user' %}?user_id=${userId}`;
+        window.location.href = `/agency/switch-user/?user_id=${userId}`;
     }
 }
 </script>

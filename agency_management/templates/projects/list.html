@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Projects{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold">Projects</h1>
+            <div class="mt-2 flex space-x-2">
+                <a href="?revenue_type=all" class="px-3 py-1 rounded text-sm {% if current_filter == 'all' %}bg-blue-500 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">
+                    All
+                </a>
+                <a href="?revenue_type=booked" class="px-3 py-1 rounded text-sm {% if current_filter == 'booked' %}bg-blue-500 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">
+                    Booked
+                </a>
+                <a href="?revenue_type=forecast" class="px-3 py-1 rounded text-sm {% if current_filter == 'forecast' %}bg-blue-500 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">
+                    Forecast
+                </a>
+            </div>
+        </div>
+        <a href="/admin/agency/project/add/" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+            <i class="fas fa-plus mr-2"></i>Add Project
+        </a>
+    </div>
+    
+    <div class="grid gap-4">
+        {% for project in projects %}
+        <div class="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-xl font-bold">
+                        <a href="{% url 'agency:project_detail' project.id %}" class="text-blue-600 hover:text-blue-800">
+                            {{ project.name }}
+                        </a>
+                    </h3>
+                    <p class="text-gray-600">Client: {{ project.client.name }}</p>
+                    <p class="text-gray-600">Status: {{ project.get_status_display }}</p>
+                    <p class="text-sm text-gray-500">{{ project.start_date|date:"M d, Y" }} - {{ project.end_date|date:"M d, Y" }}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-2xl font-bold text-green-600">${{ project.total_revenue|floatformat:0 }}</p>
+                    <p class="text-sm text-gray-500">{{ project.total_hours|floatformat:0 }} hours</p>
+                    {% if project.revenue_type %}
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full
+                        {% if project.revenue_type == 'booked' %}bg-green-100 text-green-800
+                        {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                        {{ project.get_revenue_type_display }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-12">
+            <i class="fas fa-project-diagram text-gray-400 text-4xl mb-4"></i>
+            <p class="text-gray-500">No projects found.</p>
+            <a href="/admin/agency/project/add/" class="mt-4 inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                Add Your First Project
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

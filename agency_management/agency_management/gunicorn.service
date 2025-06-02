@@ -1,0 +1,14 @@
+[Unit]
+Description=gunicorn daemon for agency management
+After=network.target
+
+[Service]
+User=deploy
+Group=www-data
+WorkingDirectory=/home/deploy/agency_management
+ExecStart=/home/deploy/venv/bin/gunicorn \
+          --config gunicorn_config.py \
+          agency_management.wsgi:application
+
+[Install]
+WantedBy=multi-user.target

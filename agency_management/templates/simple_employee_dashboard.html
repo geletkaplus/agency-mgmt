@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="header">
+        <h1>Employee Dashboard</h1>
+        <p>Welcome, {{ viewing_user.get_full_name|default:viewing_user.username }}</p>
+    </div>
+
+    {% if is_viewing_as %}
+    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        👤 Admin is viewing as: {{ viewing_user.username }}
+        <a href="/agency/switch-back/" class="back" style="float: right;">Back to Admin</a>
+    </div>
+    {% endif %}
+
+    <div class="info">
+        <h2>Your Information</h2>
+        <p><strong>Role:</strong> {{ user_profile.get_role_display }}</p>
+        <p><strong>Company:</strong> {{ user_profile.company.name }}</p>
+        <p><strong>Hours this month:</strong> 120 / 160</p>
+        <p><strong>Projects:</strong> 3 active</p>
+    </div>
+{% endblock %}
