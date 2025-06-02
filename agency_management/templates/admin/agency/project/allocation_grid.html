@@ -1,15 +1,31 @@
 {% load static %}
-<div class="allocation-grid">
-    <h2>Team Member Allocations</h2>
-    <p class="help">Allocate hours to team members for each month of the project.</p>
-    
-    <div id="allocation-container">
-        <!-- Allocation grid will be loaded here -->
-        <p>Save the project to see the allocation grid.</p>
+<style>
+    #allocation-container { 
+        min-height: 200px; 
+        position: relative;
+    }
+    #allocation-container.loading::after {
+        content: 'Loading allocations...';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #666;
+    }
+</style>
+
+<fieldset class="module aligned">
+    <h2>Team Hour Allocations</h2>
+    <div class="description">
+        <p>Assign hours to team members for this project. Add team members above first, then save the project to see this grid.</p>
     </div>
-    
-    <script>
-    // This will be populated by the admin view
-    const projectId = '{{ project.id }}';
-    </script>
-</div>
+    <div id="allocation-container" class="loading">
+        <p>Loading allocation grid...</p>
+    </div>
+</fieldset>
+
+<script>
+    // Store project ID for the allocation script
+    window.currentProjectId = '{{ project.id|escapejs }}';
+    console.log('[Template] Project ID:', window.currentProjectId);
+</script>

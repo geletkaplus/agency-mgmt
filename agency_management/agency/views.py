@@ -304,6 +304,14 @@ def dashboard(request):
             
             'current_year': current_year,
             'current_month': current_month,
+        
+            
+            # Add initial chart data for current year
+            'months': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            'booked': [0] * 12,
+            'forecast': [0] * 12,
+            'combined': [0] * 12,
+            'expenses': [0] * 12,
         }
         
         # Add all profiles for user switcher if superuser

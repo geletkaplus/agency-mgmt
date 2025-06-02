@@ -400,25 +400,20 @@
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+// Dashboard Filtering System with Working Metrics
+console.log('[Dashboard] Initializing with metric updates...');
+
 // Global variables
 let revenueChart = null;
 let currentRange = 'current_month';
 let currentStartDate = null;
 let currentEndDate = null;
 
-// Debug mode
-const DEBUG = true;
-
-function log(message, data = null) {
-    if (DEBUG) {
-        console.log('[Dashboard]', message, data || '');
-    }
-}
-
 // Initialize dashboard when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    log('Initializing dashboard...');
+    console.log('[Dashboard] DOM loaded, initializing...');
     initializeDashboard();
 });
 
@@ -431,13 +426,19 @@ function initializeDashboard() {
     currentStartDate = monthStart;
     currentEndDate = monthEnd;
     
+    // Set initial date inputs
     document.getElementById('startDate').value = formatDate(monthStart);
     document.getElementById('endDate').value = formatDate(monthEnd);
     
-    log('Date range set to:', { start: formatDate(monthStart), end: formatDate(monthEnd) });
+    console.log('[Dashboard] Initial date range:', {
+        start: formatDate(monthStart),
+        end: formatDate(monthEnd)
+    });
     
+    // Initialize the chart
     initializeChart();
-    updateDashboard();
+    
+    // Don't update dashboard here - the chart data is already loaded server-side
 }
 
 function formatDate(date) {
@@ -456,7 +457,7 @@ function showError(message) {
 }
 
 function setDateRange(range) {
-    log('Setting date range:', range);
+    console.log('[Dashboard] Setting date range:', range);
     
     const now = new Date();
     let startDate, endDate, label;
@@ -469,54 +470,31 @@ function setDateRange(range) {
     
     currentRange = range;
     
-    // Hide/show year selector based on range
-    const yearSelector = document.getElementById('yearSelector');
-    const aggregationControl = document.getElementById('aggregationControl');
-    
     switch(range) {
         case 'current_month':
             startDate = new Date(now.getFullYear(), now.getMonth(), 1);
             endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            label = `${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
-            yearSelector.style.display = 'none';
-            aggregationControl.style.display = 'block';
+            label = startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
             break;
         case 'last_month':
             startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
             endDate = new Date(now.getFullYear(), now.getMonth(), 0);
-            label = `${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
-            yearSelector.style.display = 'none';
-            aggregationControl.style.display = 'block';
+            label = startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
             break;
         case 'ytd':
             startDate = new Date(now.getFullYear(), 0, 1);
             endDate = now;
             label = `Year to Date ${now.getFullYear()}`;
-            yearSelector.style.display = 'none';
-            aggregationControl.style.display = 'block';
             break;
         case 'last_12':
-            startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+            startDate = new Date(now.getFullYear() - 1, now.getMonth(), 1);
             endDate = now;
             label = 'Last 12 Months';
-            yearSelector.style.display = 'none';
-            aggregationControl.style.display = 'block';
-            break;
-        case 'annual':
-            const selectedYear = parseInt(document.getElementById('yearSelect').value);
-            startDate = new Date(selectedYear, 0, 1);
-            endDate = new Date(selectedYear, 11, 31);
-            label = `Annual ${selectedYear}`;
-            yearSelector.style.display = 'block';
-            aggregationControl.style.display = 'none';
-            document.getElementById('aggregationLevel').value = 'monthly';
             break;
         case 'custom':
             document.getElementById('customDateInputs').style.display = 'flex';
             document.getElementById('currentSelection').textContent = 'Custom Range';
-            yearSelector.style.display = 'none';
-            aggregationControl.style.display = 'block';
-            return; // Don't update dashboard until user sets dates
+            return;
     }
     
     if (range !== 'custom') {
@@ -528,13 +506,12 @@ function setDateRange(range) {
         document.getElementById('endDate').value = formatDate(endDate);
         document.getElementById('currentSelection').textContent = label;
         
-        log('Updated date range:', { start: formatDate(startDate), end: formatDate(endDate), label });
         updateDashboard();
     }
 }
 
 function updateDashboard() {
-    log('Updating dashboard...');
+    console.log('[Dashboard] Updating dashboard...');
     
     if (currentRange === 'custom') {
         const startInput = document.getElementById('startDate').value;
@@ -548,36 +525,30 @@ function updateDashboard() {
         currentStartDate = new Date(startInput);
         currentEndDate = new Date(endInput);
         
-        const label = `${currentStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${currentEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-        document.getElementById('currentSelection').textContent = label;
-        
-        log('Custom date range set:', { start: formatDate(currentStartDate), end: formatDate(currentEndDate) });
-    }
-    
-    if (currentRange === 'annual') {
-        const selectedYear = parseInt(document.getElementById('yearSelect').value);
-        currentStartDate = new Date(selectedYear, 0, 1);
-        currentEndDate = new Date(selectedYear, 11, 31);
+        document.getElementById('currentSelection').textContent = 
+            `${currentStartDate.toLocaleDateString()} - ${currentEndDate.toLocaleDateString()}`;
     }
     
     // Show loading state
-    document.getElementById('dynamicMetrics').classList.add('loading');
-    document.getElementById('revenueChart').style.opacity = '0.5';
+    document.querySelectorAll('.metric-card').forEach(card => {
+        card.style.opacity = '0.6';
+    });
     
-    // Update metrics and chart
+    // Fetch both dashboard data and chart data
     Promise.all([
         fetchDashboardData(),
-        fetchChartData(),
-        fetchAnnualData()
+        fetchChartData()
     ]).then(() => {
-        log('Dashboard update completed');
-        document.getElementById('dynamicMetrics').classList.remove('loading');
-        document.getElementById('revenueChart').style.opacity = '1';
+        console.log('[Dashboard] Update completed');
+        document.querySelectorAll('.metric-card').forEach(card => {
+            card.style.opacity = '1';
+        });
     }).catch(error => {
-        console.error('Error updating dashboard:', error);
-        showError('Failed to update dashboard data');
-        document.getElementById('dynamicMetrics').classList.remove('loading');
-        document.getElementById('revenueChart').style.opacity = '1';
+        console.error('[Dashboard] Update error:', error);
+        showError('Failed to update dashboard');
+        document.querySelectorAll('.metric-card').forEach(card => {
+            card.style.opacity = '1';
+        });
     });
 }
 
@@ -588,209 +559,200 @@ function fetchDashboardData() {
         aggregation: document.getElementById('aggregationLevel').value
     });
     
-    const url = '/agency/api/dashboard-data/?' + params.toString();
-    log('Fetching dashboard data from:', url);
+    const url = `/agency/api/dashboard-data/?${params}`;
+    console.log('[Dashboard] Fetching metrics from:', url);
     
-    return fetch(url)
-        .then(response => {
-            log('Dashboard data response status:', response.status);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            log('Dashboard data received:', data);
-            updateMetrics(data);
-        })
-        .catch(error => {
-            console.error('Dashboard data fetch error:', error);
-            // Fallback to template data if API fails
-            const fallbackData = {
-                revenue: parseFloat('{{ current_revenue|default:0 }}'),
-                booked_revenue: parseFloat('{{ current_revenue|default:0 }}'),
-                forecast_revenue: 0,
-                costs: parseFloat('{{ current_month_costs|default:0 }}'),
-                payroll_costs: parseFloat('{{ payroll_costs|default:0 }}'),
-                contractor_costs: parseFloat('{{ contractor_costs|default:0 }}'),
-                other_costs: parseFloat('{{ other_costs|default:0 }}'),
-                profit: parseFloat('{{ monthly_profit|default:0 }}'),
-                profit_margin: parseFloat('{{ monthly_profit_margin|default:0 }}'),
-                capacity: 0,
-                utilization_rate: 0,
-                allocated_hours: 0,
-                avg_project_value: parseFloat('{{ total_annual_revenue|default:0 }}') / Math.max(1, parseInt('{{ total_projects|default:1 }}'))
-            };
-            updateMetrics(fallbackData);
-        });
+    return fetch(url, {
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        console.log('[Dashboard] Metrics response:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('[Dashboard] Metrics data:', data);
+        updateMetrics(data);
+    })
+    .catch(error => {
+        console.error('[Dashboard] Metrics error:', error);
+        // Don't throw, just log the error
+    });
 }
 
 function fetchChartData() {
-    const year = currentStartDate.getFullYear();
     const params = new URLSearchParams({
-        year: year
+        year: currentStartDate.getFullYear()
     });
     
-    const url = '/agency/api/revenue-chart/?' + params.toString();
-    log('Fetching chart data from:', url);
+    const url = `/agency/api/revenue-chart/?${params}`;
+    console.log('[Dashboard] Fetching chart data from:', url);
     
-    return fetch(url)
-        .then(response => {
-            log('Chart data response status:', response.status);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            log('Chart data received:', data);
-            updateChart(data);
-        })
-        .catch(error => {
-            console.error('Chart data fetch error:', error);
-            showError(`Failed to fetch chart data: ${error.message}`);
-        });
-}
-
-function fetchAnnualData() {
-    // Update annual summary
-    const year = currentRange === 'annual' ? 
-        parseInt(document.getElementById('yearSelect').value) : 
-        currentStartDate.getFullYear();
-    
-    document.getElementById('annualYear').textContent = year;
-    
-    // For now, use existing annual data from template
-    // In production, this would fetch from an API endpoint
-    const annualData = {
-        revenue: parseFloat('{{ total_annual_revenue|default:0 }}'),
-        booked_revenue: parseFloat('{{ annual_booked_revenue|default:0 }}'),
-        forecast_revenue: parseFloat('{{ annual_forecast_revenue|default:0 }}'),
-        costs: parseFloat('{{ total_annual_costs|default:0 }}'),
-        payroll_costs: parseFloat('{{ payroll_costs|default:0 }}') * 12,
-        contractor_costs: parseFloat('{{ contractor_costs|default:0 }}') * 12,
-        other_costs: parseFloat('{{ other_costs|default:0 }}') * 12,
-        profit: parseFloat('{{ annual_profit|default:0 }}'),
-        profit_margin: parseFloat('{{ annual_profit_margin|default:0 }}')
-    };
-    
-    updateAnnualMetrics(annualData);
-    return Promise.resolve();
+    return fetch(url, {
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('[Dashboard] Chart data:', data);
+        updateChart(data);
+    })
+    .catch(error => {
+        console.error('[Dashboard] Chart error:', error);
+    });
 }
 
 function updateMetrics(data) {
-    log('Updating metrics with data:', data);
+    console.log('[Dashboard] Updating metrics with:', data);
     
-    // Update dynamic metrics
-    document.getElementById('dynamicRevenue').textContent = `$${(data.revenue || 0).toLocaleString()}`;
-    document.getElementById('dynamicCosts').textContent = `$${(data.costs || 0).toLocaleString()}`;
-    document.getElementById('dynamicProfit').textContent = `$${(data.profit || 0).toLocaleString()}`;
-    document.getElementById('dynamicCapacity').textContent = `${(data.capacity || 0).toLocaleString()} hrs`;
+    // Update revenue card
+    const revenueEl = document.getElementById('dynamicRevenue');
+    if (revenueEl) {
+        revenueEl.textContent = `$${Math.round(data.revenue || 0).toLocaleString()}`;
+    }
     
-    // Update profit color
-    const profitElement = document.getElementById('dynamicProfit');
-    profitElement.className = `metric-value ${data.profit >= 0 ? 'positive' : 'negative'}`;
+    // Update revenue breakdown
+    const bookedEl = document.getElementById('bookedAmount');
+    if (bookedEl) {
+        bookedEl.textContent = `$${Math.round(data.booked_revenue || 0).toLocaleString()} booked`;
+    }
     
-    // Update sub-metrics
-    document.getElementById('bookedAmount').textContent = `$${(data.booked_revenue || 0).toLocaleString()} booked`;
-    document.getElementById('forecastAmount').textContent = `$${(data.forecast_revenue || 0).toLocaleString()} forecast`;
-    document.getElementById('payrollAmount').textContent = (data.payroll_costs || 0).toLocaleString();
-    document.getElementById('contractorAmount').textContent = (data.contractor_costs || 0).toLocaleString();
-    document.getElementById('otherCostsAmount').textContent = (data.other_costs || 0).toLocaleString();
-    document.getElementById('profitMargin').textContent = `${(data.profit_margin || 0).toFixed(1)}%`;
-    document.getElementById('utilizationRate').textContent = `${(data.utilization_rate || 0).toFixed(1)}%`;
-    document.getElementById('allocatedHours').textContent = (data.allocated_hours || 0).toLocaleString();
+    const forecastEl = document.getElementById('forecastAmount');
+    if (forecastEl) {
+        forecastEl.textContent = `$${Math.round(data.forecast_revenue || 0).toLocaleString()} forecast`;
+    }
+    
+    // Update costs card
+    const costsEl = document.getElementById('dynamicCosts');
+    if (costsEl) {
+        costsEl.textContent = `$${Math.round(data.costs || 0).toLocaleString()}`;
+    }
+    
+    // Update cost breakdown
+    const payrollEl = document.getElementById('payrollAmount');
+    if (payrollEl) {
+        payrollEl.textContent = Math.round(data.payroll_costs || 0).toLocaleString();
+    }
+    
+    const otherCostsEl = document.getElementById('otherCostsAmount');
+    if (otherCostsEl) {
+        const otherCosts = (data.contractor_costs || 0) + (data.other_costs || 0);
+        otherCostsEl.textContent = Math.round(otherCosts).toLocaleString();
+    }
+    
+    // Update profit card
+    const profitEl = document.getElementById('dynamicProfit');
+    if (profitEl) {
+        const profit = data.profit || 0;
+        profitEl.textContent = `$${Math.round(Math.abs(profit)).toLocaleString()}`;
+        profitEl.className = `metric-value ${profit >= 0 ? 'positive' : 'negative'}`;
+        if (profit < 0) {
+            profitEl.textContent = '-' + profitEl.textContent;
+        }
+    }
+    
+    // Update profit margin
+    const marginEl = document.getElementById('profitMargin');
+    if (marginEl) {
+        marginEl.textContent = `${(data.profit_margin || 0).toFixed(1)}%`;
+    }
+    
+    // Update capacity card
+    const capacityEl = document.getElementById('dynamicCapacity');
+    if (capacityEl) {
+        capacityEl.textContent = `${Math.round(data.capacity || 0).toLocaleString()} hrs`;
+    }
+    
+    // Update utilization
+    const utilizationEl = document.getElementById('utilizationRate');
+    if (utilizationEl) {
+        utilizationEl.textContent = `${(data.utilization_rate || 0).toFixed(1)}%`;
+    }
+    
+    const allocatedEl = document.getElementById('allocatedHours');
+    if (allocatedEl) {
+        allocatedEl.textContent = `${Math.round(data.allocated_hours || 0).toLocaleString()}`;
+    }
     
     // Update average project value
-    document.getElementById('avgProjectValue').textContent = (data.avg_project_value || 0).toLocaleString();
+    const avgValueEl = document.getElementById('avgProjectValue');
+    if (avgValueEl) {
+        avgValueEl.textContent = Math.round(data.avg_project_value || 0).toLocaleString();
+    }
     
-    // Update metric labels based on time range
+    // Update metric labels based on period
     const isMonthly = currentRange === 'current_month' || currentRange === 'last_month';
-    const isAnnual = currentRange === 'annual';
+    const periodText = isMonthly ? 'Monthly' : 'Period';
     
-    document.querySelector('#monthlyRevenueCard .metric-label').textContent = 
-        isAnnual ? 'Annual Revenue' : (isMonthly ? 'Monthly Revenue' : 'Period Revenue');
-    document.querySelector('#monthlyCostsCard .metric-label').textContent = 
-        isAnnual ? 'Annual Costs' : (isMonthly ? 'Monthly Costs' : 'Period Costs');
-    document.querySelector('#monthlyProfitCard .metric-label').textContent = 
-        isAnnual ? 'Annual Profit' : (isMonthly ? 'Monthly Profit' : 'Period Profit');
-    document.querySelector('#monthlyCapacityCard .metric-label').textContent = 
-        isAnnual ? 'Annual Capacity' : (isMonthly ? 'Monthly Capacity' : 'Period Capacity');
-}
-
-function updateAnnualMetrics(data) {
-    document.getElementById('annualRevenue').textContent = `$${(data.revenue || 0).toLocaleString()}`;
-    document.getElementById('annualBookedRevenue').textContent = `$${(data.booked_revenue || 0).toLocaleString()}`;
-    document.getElementById('annualForecastRevenue').textContent = `$${(data.forecast_revenue || 0).toLocaleString()}`;
-    document.getElementById('annualCosts').textContent = `$${(data.costs || 0).toLocaleString()}`;
-    document.getElementById('annualPayrollCosts').textContent = `$${(data.payroll_costs || 0).toLocaleString()}`;
-    document.getElementById('annualContractorCosts').textContent = `$${(data.contractor_costs || 0).toLocaleString()}`;
-    document.getElementById('annualOtherCosts').textContent = `$${(data.other_costs || 0).toLocaleString()}`;
-    
-    const profitElement = document.getElementById('annualProfit');
-    profitElement.textContent = `$${(data.profit || 0).toLocaleString()}`;
-    profitElement.className = `text-2xl font-bold ${data.profit >= 0 ? 'text-green-600' : 'text-red-600'}`;
-    
-    const marginElement = document.getElementById('annualMargin');
-    marginElement.textContent = `${(data.profit_margin || 0).toFixed(1)}%`;
-    marginElement.className = `text-2xl font-bold ${data.profit >= 0 ? 'text-green-600' : 'text-red-600'}`;
+    document.querySelectorAll('.metric-label').forEach(label => {
+        const text = label.textContent;
+        if (text.includes('Revenue') || text.includes('Costs') || 
+            text.includes('Profit') || text.includes('Capacity')) {
+            label.textContent = text.replace(/^(Monthly|Period|Annual)/, periodText);
+        }
+    });
 }
 
 function initializeChart() {
-    log('Initializing chart...');
+    const ctx = document.getElementById('revenueChart');
+    if (!ctx) return;
     
-    const ctx = document.getElementById('revenueChart').getContext('2d');
-    
-    revenueChart = new Chart(ctx, {
+    revenueChart = new Chart(ctx.getContext('2d'), {
         type: 'line',
         data: {
-            labels: [],
+            labels: {{ months|default:"[]"|safe }},
             datasets: [
                 {
                     label: 'Total Revenue',
-                    data: [],
+                    data: {{ combined|default:"[]"|safe }},
                     borderColor: 'rgb(59, 130, 246)',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
                     tension: 0.1,
-                    fill: false,
-                    order: 1
+                    fill: false
                 },
                 {
                     label: 'Booked Revenue',
-                    data: [],
+                    data: {{ booked|default:"[]"|safe }},
                     borderColor: 'rgb(34, 197, 94)',
                     backgroundColor: 'rgba(34, 197, 94, 0.1)',
                     tension: 0.1,
-                    fill: false,
-                    order: 2
+                    fill: false
                 },
                 {
                     label: 'Forecast Revenue',
-                    data: [],
+                    data: {{ forecast|default:"[]"|safe }},
                     borderColor: 'rgb(234, 179, 8)',
                     backgroundColor: 'rgba(234, 179, 8, 0.1)',
                     tension: 0.1,
-                    fill: false,
-                    order: 3
+                    fill: false
                 },
                 {
                     label: 'Operating Expenses',
-                    data: [],
+                    data: {{ expenses|default:"[]"|safe }},
                     borderColor: 'rgb(239, 68, 68)',
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
                     tension: 0.1,
-                    fill: false,
-                    order: 4
+                    fill: false
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
             plugins: {
                 legend: {
                     display: true,
@@ -821,64 +783,68 @@ function initializeChart() {
             }
         }
     });
-    
-    log('Chart initialized successfully');
 }
 
 function updateChart(data) {
-    log('Updating chart with data:', data);
+    if (!revenueChart || !data) return;
     
-    if (!revenueChart) {
-        log('Chart not initialized, skipping update');
-        return;
-    }
+    console.log('[Dashboard] Updating chart with:', data);
     
-    // Filter data based on current date range if needed
-    let filteredData = filterChartData(data);
+    // Filter based on date range
+    let filteredData = filterChartDataByDateRange(data);
     
-    revenueChart.data.labels = filteredData.months || [];
-    revenueChart.data.datasets[0].data = filteredData.combined || [];
-    revenueChart.data.datasets[1].data = filteredData.booked || [];
-    revenueChart.data.datasets[2].data = filteredData.forecast || [];
-    revenueChart.data.datasets[3].data = filteredData.expenses || [];
+    revenueChart.data.labels = filteredData.labels;
+    revenueChart.data.datasets[0].data = filteredData.combined;
+    revenueChart.data.datasets[1].data = filteredData.booked;
+    revenueChart.data.datasets[2].data = filteredData.forecast;
+    revenueChart.data.datasets[3].data = filteredData.expenses;
     revenueChart.update();
-    
-    log('Chart updated successfully');
 }
 
-function filterChartData(data) {
-    // If showing full year or annual view, return all data
-    if (currentRange === 'annual' || currentRange === 'ytd' || currentRange === 'last_12') {
-        return data;
-    }
-    
-    // For monthly views, filter to show only relevant months
+function filterChartDataByDateRange(data) {
     const startMonth = currentStartDate.getMonth();
     const endMonth = currentEndDate.getMonth();
     const startYear = currentStartDate.getFullYear();
     const endYear = currentEndDate.getFullYear();
     
-    if (startYear === endYear && (currentRange === 'current_month' || currentRange === 'last_month')) {
-        // Single month view
-        const monthIndex = startMonth;
-        return {
-            months: [data.months[monthIndex]],
-            combined: [data.combined[monthIndex]],
-            booked: [data.booked[monthIndex]],
-            forecast: [data.forecast[monthIndex]],
-            expenses: [data.expenses[monthIndex]]
+    let result = {
+        labels: [],
+        combined: [],
+        booked: [],
+        forecast: [],
+        expenses: []
+    };
+    
+    // If same year, filter by month
+    if (startYear === endYear && data.year === startYear) {
+        data.months.forEach((month, index) => {
+            if (index >= startMonth && index <= endMonth) {
+                result.labels.push(month);
+                result.combined.push(data.combined?.[index] || 0);
+                result.booked.push(data.booked?.[index] || 0);
+                result.forecast.push(data.forecast?.[index] || 0);
+                result.expenses.push(data.expenses?.[index] || 0);
+            }
+        });
+    } else {
+        // For multi-year or different year, show all data
+        result = {
+            labels: data.months || [],
+            combined: data.combined || [],
+            booked: data.booked || [],
+            forecast: data.forecast || [],
+            expenses: data.expenses || []
         };
     }
     
-    // For custom ranges or other views, return all data
-    return data;
+    return result;
 }
 
-// User switcher function
+// User switcher
 function switchUserView(userId) {
     if (userId) {
         window.location.href = `/agency/switch-user/?user_id=${userId}`;
     }
 }
-</script>
+</script></script>
 {% endblock %}

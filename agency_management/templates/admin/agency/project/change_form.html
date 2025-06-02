@@ -1,0 +1,28 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block field_sets %}
+{{ block.super }}
+
+{% if object_id and show_allocation_grid %}
+<fieldset class="module aligned">
+    <h2>Team Hour Allocations</h2>
+    <div id="allocation-container">
+        <!-- Allocation grid will be loaded here by JavaScript -->
+    </div>
+</fieldset>
+{% endif %}
+{% endblock %}
+
+{% block admin_change_form_document_ready %}
+{{ block.super }}
+<script>
+// Hide the team_members field if it exists
+document.addEventListener('DOMContentLoaded', function() {
+    const teamMembersField = document.querySelector('.field-team_members');
+    if (teamMembersField) {
+        teamMembersField.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}
